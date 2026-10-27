@@ -29,6 +29,7 @@ options:
     - cover
     - vacuum
     - scene
+  auto_discover: true
   extra_entities: []
   hidden_entities: []
 schema:
@@ -43,6 +44,7 @@ schema:
   actions_enabled: bool
   allowed_domains:
     - str
+  auto_discover: bool
   extra_entities:
     - str
   hidden_entities:

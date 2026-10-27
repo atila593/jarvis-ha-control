@@ -18,7 +18,7 @@ from tools.sys_diagnose import SystemDiagnose  # noqa: E402
 logging.basicConfig(level=config.LOG_LEVEL)
 logger = logging.getLogger("JarvisCore")
 
-app = FastAPI(title="Jarvis HA Control", version="1.3.0")
+app = FastAPI(title="Jarvis HA Control", version="1.4.0")
 jarvis = JarvisEngine()
 diagnose = SystemDiagnose()
 

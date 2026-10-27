@@ -20,6 +20,7 @@ GEMINI_FALLBACK_MODEL = OPTIONS.get("gemini_fallback_model") or ""
 LOG_LEVEL = (OPTIONS.get("log_level") or "info").upper()
 SPEAK_SERVICE = (OPTIONS.get("speak_service") or "").strip()
 SPEAK_TARGETS = OPTIONS.get("speak_targets") or []
+AUTO_DISCOVER = bool(OPTIONS.get("auto_discover", True))
 EXTRA_ENTITIES = OPTIONS.get("extra_entities") or []
 HIDDEN_ENTITIES = OPTIONS.get("hidden_entities") or []
 ACTIONS_ENABLED = bool(OPTIONS.get("actions_enabled", True))

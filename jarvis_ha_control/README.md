@@ -29,5 +29,6 @@ Jarvis peut agir quand tu le demandes clairement (« allume la salle à manger �
 | `gemini_fallback_model` | Modèle de secours si le principal est saturé |
 | `actions_enabled` | Autorise Jarvis à agir (défaut : oui) |
 | `allowed_domains` | Domaines pilotables (défaut : light, cover, vacuum, scene ; aussi switch, fan) |
-| `extra_entities` | Entités à épingler dans « Modules domotiques » |
+| `auto_discover` | `true` : détecte aussi caméras, aspirateur, capteurs ; `false` : surveille uniquement `extra_entities` |
+| `extra_entities` | Liste des entités à surveiller (classées automatiquement : modules, caméras/réseau, serveur/services) |
 | `hidden_entities` | Entités à masquer du tableau |

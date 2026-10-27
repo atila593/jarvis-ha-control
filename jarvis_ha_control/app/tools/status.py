@@ -13,16 +13,36 @@ logger = logging.getLogger("JarvisStatus")
 MAP_RE = re.compile(r"carte|map", re.I)
 LEVEL_LABEL = {"ok": "OK", "warn": "ATTENTION", "ko": "KO"}
 OVERALL_LABEL = {"ok": "TOUT EST NOMINAL", "warn": "ATTENTION", "ko": "ALERTE"}
+KIND_ORDER = {"vacuum": 0, "cover": 1, "light": 2, "plug": 3, "other": 4}
+GROUPS = [("modules", "Modules domotiques"), ("network", "Réseau & caméras"), ("system", "Serveur & services")]
 
 STATE_FR = {
     "docked": "À la base", "cleaning": "Nettoyage", "returning": "Retour à la base", "idle": "Inactif",
     "paused": "En pause", "error": "Erreur", "recording": "Enregistre", "streaming": "Flux actif",
     "locked": "Verrouillée", "unlocked": "Déverrouillée", "jammed": "Bloquée",
+    "open": "Ouvert", "closed": "Fermé", "opening": "Ouverture", "closing": "Fermeture",
     "unavailable": "Indisponible", "unknown": "Inconnu",
 }
 
 
-def _level(domain: str, dclass: str, state: str) -> str:
+def _kind(domain: str) -> str:
+    if domain in ("vacuum", "cover", "light"):
+        return domain
+    return "plug" if domain in ("switch", "fan") else "other"
+
+
+def _is_garage(eid: str, name: str) -> bool:
+    return "garage" in eid.lower() or "garage" in name.lower() or "rideau" in eid.lower()
+
+
+def _num(state: str):
+    try:
+        return float(state)
+    except (TypeError, ValueError):
+        return None
+
+
+def _level(domain, dclass, state, attrs, eid, name) -> str:
     if state == "unavailable":
         return "ko"
     if state == "unknown":
@@ -33,20 +53,40 @@ def _level(domain: str, dclass: str, state: str) -> str:
         return "ko" if state == "jammed" else "ok"
     if domain == "camera":
         return "ok" if state in ("idle", "recording", "streaming") else "warn"
+    if domain == "cover":
+        return "warn" if (state == "open" and _is_garage(eid, name)) else "ok"
+    if domain == "update":
+        return "warn" if state == "on" else "ok"
     if domain == "binary_sensor":
         if dclass == "problem":
             return "ko" if state == "on" else "ok"
-        if dclass == "connectivity":
+        if dclass in ("connectivity", "running"):
             return "ko" if state == "off" else "ok"
+    if domain == "sensor":
+        v, unit = _num(state), attrs.get("unit_of_measurement")
+        if v is not None and unit == "%" and dclass != "battery":
+            return "ko" if v >= 95 else "warn" if v >= 85 else "ok"
+        if v is not None and (dclass == "temperature" or unit == "°C") and "temperature" in eid.lower() and "localhost" in eid.lower():
+            return "ko" if v >= 85 else "warn" if v >= 75 else "ok"
     return "ok"
 
 
-def _display(domain: str, dclass: str, state: str, attrs: dict) -> str:
+def _display(domain, dclass, state, attrs) -> str:
+    if state in ("unavailable", "unknown"):
+        return STATE_FR[state]
+    if domain == "light":
+        return {"on": "Allumé", "off": "Éteint"}.get(state, state)
+    if domain in ("switch", "fan"):
+        return {"on": "Actif", "off": "Arrêté"}.get(state, state)
+    if domain == "update":
+        return "Mise à jour disponible" if state == "on" else "À jour"
     if domain == "binary_sensor":
         if dclass == "problem":
             return "Problème" if state == "on" else "RAS"
         if dclass == "connectivity":
             return "Connecté" if state == "on" else "Déconnecté"
+        if dclass == "running":
+            return "En marche" if state == "on" else "Arrêté"
     if domain == "sensor":
         unit = attrs.get("unit_of_measurement")
         return f"{state} {unit}" if unit else state
@@ -59,45 +99,83 @@ def _item(s: dict) -> dict:
     attrs = s.get("attributes", {}) or {}
     state = str(s.get("state"))
     dclass = attrs.get("device_class") or ""
+    name = attrs.get("friendly_name", eid)
     return {
         "entity_id": eid,
-        "name": attrs.get("friendly_name", eid),
+        "name": name,
         "state": state,
         "display": _display(domain, dclass, state, attrs),
-        "level": _level(domain, dclass, state),
+        "level": _level(domain, dclass, state, attrs, eid, name),
+        "kind": _kind(domain),
     }
+
+
+def _group_for(s: dict) -> str:
+    eid = s["entity_id"]
+    domain = eid.split(".")[0]
+    attrs = s.get("attributes", {}) or {}
+    dclass = attrs.get("device_class") or ""
+    if domain == "camera":
+        return "network"
+    if domain == "update":
+        return "system"
+    if domain == "binary_sensor":
+        return {"connectivity": "network", "problem": "modules"}.get(dclass, "system")
+    if domain == "sensor":
+        return "system"
+    return "modules"
 
 
 def classify(states: list) -> list:
     hidden = set(config.HIDDEN_ENTITIES)
-    extra = set(config.EXTRA_ENTITIES)
-    modules, network = [], []
-    power = 0
-    for s in states:
-        eid = s.get("entity_id", "")
-        if eid in hidden:
+    by_id = {s.get("entity_id"): s for s in states}
+    out = {gid: [] for gid, _ in GROUPS}
+    seen = set()
+
+    def place(gid, s):
+        if s["entity_id"] in seen:
+            return
+        seen.add(s["entity_id"])
+        out[gid].append(_item(s))
+
+    # 1. Entités surveillées explicitement (option extra_entities)
+    for eid in config.EXTRA_ENTITIES:
+        if eid in hidden or eid in seen:
             continue
-        domain = eid.split(".")[0]
-        attrs = s.get("attributes", {}) or {}
-        dclass = attrs.get("device_class") or ""
-        name = attrs.get("friendly_name", eid)
-        if domain == "camera":
-            if not MAP_RE.search(name) and not MAP_RE.search(eid) and len(network) < 12:
-                network.append(_item(s))
-        elif domain == "binary_sensor" and dclass == "connectivity":
-            network.append(_item(s))
-        elif domain in ("vacuum", "lock") or (domain == "binary_sensor" and dclass == "problem"):
-            modules.append(_item(s))
-        elif domain == "sensor" and dclass == "power" and power < 6:
-            power += 1
-            modules.append(_item(s))
-        elif eid in extra:
-            modules.append(_item(s))
-    # entités épinglées déjà classées ailleurs : rien à faire
-    return [
-        {"id": "modules", "title": "Modules domotiques", "items": modules},
-        {"id": "network", "title": "Réseau & caméras", "items": network},
-    ]
+        s = by_id.get(eid)
+        if s:
+            place(_group_for(s), s)
+        else:
+            seen.add(eid)
+            domain = eid.split(".")[0]
+            out["network" if domain == "camera" else "modules"].append(
+                {"entity_id": eid, "name": eid, "state": "missing", "display": "Introuvable", "level": "warn", "kind": _kind(domain)})
+
+    # 2. Découverte automatique (désactivable avec auto_discover: false)
+    if config.AUTO_DISCOVER:
+        power, cams = 0, 0
+        for s in states:
+            eid = s.get("entity_id", "")
+            if eid in hidden:
+                continue
+            domain = eid.split(".")[0]
+            attrs = s.get("attributes", {}) or {}
+            dclass = attrs.get("device_class") or ""
+            name = attrs.get("friendly_name", eid)
+            if domain == "camera":
+                if not MAP_RE.search(name) and not MAP_RE.search(eid) and cams < 12:
+                    cams += 1
+                    place("network", s)
+            elif domain == "binary_sensor" and dclass == "connectivity":
+                place("network", s)
+            elif domain in ("vacuum", "lock") or (domain == "binary_sensor" and dclass == "problem"):
+                place("modules", s)
+            elif domain == "sensor" and dclass == "power" and power < 6:
+                power += 1
+                place("modules", s)
+
+    out["modules"].sort(key=lambda it: KIND_ORDER.get(it["kind"], 9))
+    return [{"id": gid, "title": title, "items": out[gid]} for gid, title in GROUPS]
 
 
 async def _ha_get(path: str):
