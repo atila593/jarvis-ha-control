@@ -15,11 +15,17 @@ SERVICES = {
     "scene": {"turn_on"},
     "switch": {"turn_on", "turn_off"},
     "fan": {"turn_on", "turn_off"},
+    # Scripts et automatisations : uniquement ceux listés dans l'option action_entities
+    "script": {"turn_on"},
+    "automation": {"trigger"},
 }
+LISTED_ONLY = ("script", "automation")
 
 
 def allowed_domains() -> list:
-    return [d for d in config.ALLOWED_DOMAINS if d in SERVICES]
+    base = [d for d in config.ALLOWED_DOMAINS if d in SERVICES and d not in LISTED_ONLY]
+    listed = [d for d in LISTED_ONLY if any(e.startswith(d + ".") for e in config.ACTION_ENTITIES)]
+    return base + listed
 
 
 class ActionRunner:
@@ -35,9 +41,9 @@ class ActionRunner:
         """Exécute une action sur un appareil de la maison.
 
         Args:
-            domain: domaine de l'appareil (light, cover, vacuum, scene, switch, fan).
+            domain: domaine de l'appareil (light, cover, vacuum, scene, switch, fan, script, automation).
             service: action (light: turn_on/turn_off ; cover: open_cover/close_cover/stop_cover/set_cover_position ;
-                vacuum: start/pause/stop/return_to_base/locate ; scene: turn_on).
+                vacuum: start/pause/stop/return_to_base/locate ; scene: turn_on ; script: turn_on ; automation: trigger).
             entity_id: identifiant exact de l'entité, pris dans le contexte fourni (ex. light.salon).
             brightness_pct: luminosité 1-100 pour light.turn_on, 0 si non précisée.
             position: position 0-100 pour cover.set_cover_position, -1 si non précisée.
@@ -48,6 +54,8 @@ class ActionRunner:
             return f"REFUSÉ : l'action '{service}' n'est pas autorisée pour {domain}."
         if not entity_id.startswith(domain + ".") or entity_id not in self.known:
             return f"ERREUR : entité '{entity_id}' introuvable. Utilise un identifiant du contexte."
+        if domain in LISTED_ONLY and entity_id not in config.ACTION_ENTITIES:
+            return f"REFUSÉ : '{entity_id}' n'est pas dans la liste des scripts/automatisations autorisés."
         if entity_id in config.HIDDEN_ENTITIES:
             return f"REFUSÉ : l'entité '{entity_id}' est masquée."
 

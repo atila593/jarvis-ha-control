@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 import config
+from tools import presence
 
 logger = logging.getLogger("JarvisStatus")
 
@@ -14,7 +15,13 @@ MAP_RE = re.compile(r"carte|map", re.I)
 LEVEL_LABEL = {"ok": "OK", "warn": "ATTENTION", "ko": "KO"}
 OVERALL_LABEL = {"ok": "TOUT EST NOMINAL", "warn": "ATTENTION", "ko": "ALERTE"}
 KIND_ORDER = {"vacuum": 0, "cover": 1, "light": 2, "plug": 3, "other": 4}
-GROUPS = [("modules", "Modules domotiques"), ("network", "Réseau & caméras"), ("system", "Serveur & services")]
+GROUPS = [("modules", "Modules domotiques"), ("presence", "Présence"), ("network", "Réseau & caméras"), ("system", "Serveur & services"), ("weather", "Météo & énergie")]
+WEATHER_KEYS = ("tourcoing", "weather", "meteo", "linky", "myelectricaldata", "enedis", "conso")
+SYSTEM_METRIC_KEYS = ("localhost", "stockage", "storage", "disk", "memoire", "swap", "nas")
+WEATHER_FR = {"clear-night": "Nuit claire", "cloudy": "Nuageux", "fog": "Brouillard", "hail": "Grêle", "lightning": "Orage",
+              "lightning-rainy": "Orage et pluie", "partlycloudy": "Éclaircies", "pouring": "Fortes pluies", "rainy": "Pluie",
+              "snowy": "Neige", "snowy-rainy": "Neige fondue", "sunny": "Ensoleillé", "windy": "Venteux",
+              "windy-variant": "Venteux nuageux", "exceptional": "Exceptionnel"}
 
 STATE_FR = {
     "docked": "À la base", "cleaning": "Nettoyage", "returning": "Retour à la base", "idle": "Inactif",
@@ -57,21 +64,26 @@ def _level(domain, dclass, state, attrs, eid, name) -> str:
         return "warn" if (state == "open" and _is_garage(eid, name)) else "ok"
     if domain == "update":
         return "warn" if state == "on" else "ok"
+    if domain == "sensor" and "weather_alert" in eid:
+        st = state.lower()
+        return "ko" if st in ("rouge", "red") else "warn" if st in ("orange", "jaune", "yellow") else "ok"
     if domain == "binary_sensor":
+        if not dclass and ("disponible" in eid or "available" in eid):
+            return "ko" if state == "off" else "ok"
         if dclass == "problem":
             return "ko" if state == "on" else "ok"
         if dclass in ("connectivity", "running"):
             return "ko" if state == "off" else "ok"
     if domain == "sensor":
         v, unit = _num(state), attrs.get("unit_of_measurement")
-        if v is not None and unit == "%" and dclass != "battery":
+        if v is not None and unit == "%" and dclass != "battery" and any(k in eid for k in SYSTEM_METRIC_KEYS):
             return "ko" if v >= 95 else "warn" if v >= 85 else "ok"
         if v is not None and (dclass == "temperature" or unit == "°C") and "temperature" in eid.lower() and "localhost" in eid.lower():
             return "ko" if v >= 85 else "warn" if v >= 75 else "ok"
     return "ok"
 
 
-def _display(domain, dclass, state, attrs) -> str:
+def _display(domain, dclass, state, attrs, eid_hint: str = "") -> str:
     if state in ("unavailable", "unknown"):
         return STATE_FR[state]
     if domain == "light":
@@ -80,7 +92,13 @@ def _display(domain, dclass, state, attrs) -> str:
         return {"on": "Actif", "off": "Arrêté"}.get(state, state)
     if domain == "update":
         return "Mise à jour disponible" if state == "on" else "À jour"
+    if domain == "weather":
+        temp = attrs.get("temperature")
+        label = WEATHER_FR.get(state, state)
+        return f"{label}, {temp} °C" if temp is not None else label
     if domain == "binary_sensor":
+        if not dclass and ("disponible" in eid_hint or "available" in eid_hint):
+            return "Disponible" if state == "on" else "Indisponible"
         if dclass == "problem":
             return "Problème" if state == "on" else "RAS"
         if dclass == "connectivity":
@@ -104,7 +122,7 @@ def _item(s: dict) -> dict:
         "entity_id": eid,
         "name": name,
         "state": state,
-        "display": _display(domain, dclass, state, attrs),
+        "display": _display(domain, dclass, state, attrs, eid),
         "level": _level(domain, dclass, state, attrs, eid, name),
         "kind": _kind(domain),
     }
@@ -121,7 +139,11 @@ def _group_for(s: dict) -> str:
         return "system"
     if domain == "binary_sensor":
         return {"connectivity": "network", "problem": "modules"}.get(dclass, "system")
+    if domain == "weather":
+        return "weather"
     if domain == "sensor":
+        if dclass in ("energy", "power", "apparent_power") or any(k in eid for k in WEATHER_KEYS):
+            return "weather"
         return "system"
     return "modules"
 
@@ -148,7 +170,7 @@ def classify(states: list) -> list:
         else:
             seen.add(eid)
             domain = eid.split(".")[0]
-            out["network" if domain == "camera" else "modules"].append(
+            out["network" if domain == "camera" else "weather" if domain == "weather" else "system" if domain in ("sensor", "update") else "modules"].append(
                 {"entity_id": eid, "name": eid, "state": "missing", "display": "Introuvable", "level": "warn", "kind": _kind(domain)})
 
     # 2. Découverte automatique (désactivable avec auto_discover: false)
@@ -172,9 +194,15 @@ def classify(states: list) -> list:
                 place("modules", s)
             elif domain == "sensor" and dclass == "power" and power < 6:
                 power += 1
-                place("modules", s)
+                place("weather", s)
 
     out["modules"].sort(key=lambda it: KIND_ORDER.get(it["kind"], 9))
+    # 3. Présence par zones (Radar Map Manager) : détectée automatiquement
+    for z in presence.zones(states):
+        out["presence"].append({
+            "entity_id": z["entity_id"], "name": z["name"].capitalize(),
+            "state": "on" if z["occupied"] else "off" if z["known"] else "unavailable",
+            "display": presence.describe(z), "level": "ok" if z["known"] else "warn", "kind": "other"})
     return [{"id": gid, "title": title, "items": out[gid]} for gid, title in GROUPS]
 
 
@@ -186,7 +214,7 @@ async def _ha_get(path: str):
     return res.json()
 
 
-async def _now_str() -> str:
+async def now_str() -> str:
     tz = "UTC"
     try:
         tz = (await _ha_get("config")).get("time_zone") or "UTC"
@@ -219,7 +247,7 @@ async def build_status(diagnose) -> dict:
     else:
         overall = "ok"
     return {
-        "generated": await _now_str(),
+        "generated": await now_str(),
         "core": core,
         "ha_ok": ha_ok,
         "overall": overall,
@@ -229,6 +257,31 @@ async def build_status(diagnose) -> dict:
         "gemini_configured": bool(config.GEMINI_API_KEY),
         "speak_configured": bool(config.SPEAK_SERVICE),
     }
+
+
+def spoken_summary(r: dict) -> str:
+    """Texte court, fait pour être lu à voix haute sur les Echo."""
+    hh, mm = r["generated"][-5:].split(":")
+    when = f"{int(hh)} heures" + (f" {int(mm)}" if int(mm) else "")
+    total = sum(len(g["items"]) for g in r["groups"] if g["id"] != "presence")
+    missing = [a for a in r["anomalies"] if a["state"] == "missing"]
+    real = [a for a in r["anomalies"] if a["state"] != "missing"]
+    parts = [f"Rapport de {when}."]
+    parts.append("Home Assistant fonctionne normalement." if r["core"].get("healthy") else "Home Assistant est injoignable.")
+    if not real:
+        parts.append(f"Les {total - len(missing)} équipements surveillés sont nominaux.")
+    else:
+        details = "; ".join(f"{a['name'].strip()}, {a['display'].lower()}" for a in real[:4])
+        parts.append(f"{len(real)} point{'s' if len(real) > 1 else ''} d'attention : {details}.")
+    if missing:
+        parts.append(f"{len(missing)} entité{'s' if len(missing) > 1 else ''} introuvable{'s' if len(missing) > 1 else ''} dans la configuration.")
+    pres = presence.spoken(next((g["items"] for g in r["groups"] if g["id"] == "presence"), []))
+    if pres:
+        parts.append(pres)
+    ana = (r.get("analysis") or "").strip()
+    if ana and not ana.startswith("Analyse IA indisponible"):
+        parts.append(ana)
+    return " ".join(parts)
 
 
 def build_report(status: dict, analysis: str | None) -> dict:

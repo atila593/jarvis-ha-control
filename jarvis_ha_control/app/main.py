@@ -18,7 +18,7 @@ from tools.sys_diagnose import SystemDiagnose  # noqa: E402
 logging.basicConfig(level=config.LOG_LEVEL)
 logger = logging.getLogger("JarvisCore")
 
-app = FastAPI(title="Jarvis HA Control", version="1.4.0")
+app = FastAPI(title="Jarvis HA Control", version="1.6.0")
 jarvis = JarvisEngine()
 diagnose = SystemDiagnose()
 
@@ -65,11 +65,10 @@ async def get_status():
     return await st.build_status(diagnose)
 
 
-@app.post("/api/diagnostic")
-async def run_diagnostic(req: DiagRequest):
+async def _make_report(analyse: bool) -> dict:
     status = await st.build_status(diagnose)
     analysis = None
-    if req.analyse:
+    if analyse:
         try:
             analysis = await jarvis.analyse(st.render_txt(st.build_report(status, None)))
         except GeminiUnavailable as e:
@@ -79,8 +78,28 @@ async def run_diagnostic(req: DiagRequest):
             analysis = f"Analyse IA indisponible : {e}"
     report = st.build_report(status, analysis)
     LAST["report"] = report
-    spoken = await speak(analysis) if (req.speak and analysis) else {"spoken": False}
+    return report
+
+
+@app.post("/api/diagnostic")
+async def run_diagnostic(req: DiagRequest):
+    report = await _make_report(req.analyse)
+    spoken = await speak(st.spoken_summary(report)) if req.speak else {"spoken": False}
     return {"status": "success", "report": report, "speech": spoken}
+
+
+class RapportRequest(BaseModel):
+    analyse: bool = True
+    speak: bool = True
+
+
+@app.post("/api/rapport")
+async def run_rapport(req: RapportRequest):
+    """Point d'entrée pour Alexa / Home Assistant : fait le diagnostic et le dit à voix haute."""
+    report = await _make_report(req.analyse)
+    text = st.spoken_summary(report)
+    spoken = await speak(text) if req.speak else {"spoken": False}
+    return {"status": "success", "text": text, "speech": spoken, "report": report}
 
 
 @app.get("/api/report")
