@@ -204,7 +204,12 @@ function downloadPng(){
 $('go').onclick=send; $('diag').onclick=diagnostic; $('voice').onclick=rapportVocal; $('png').onclick=downloadPng;
 $('q').addEventListener('keydown',e=>{ if(e.key==='Enter') send(); });
 add('bot','JARVIS : systèmes opérationnels. En attente de vos commandes textuelles.');
-refresh(); setInterval(refresh, 20000);
+async function refreshPresence(){
+  if(document.hidden) return;
+  try { const r = await fetch('api/presence'); const j = await r.json(); if((j.items||[]).length) renderItems($('g-presence'), j.items, false); }
+  catch(e){}
+}
+refresh(); setInterval(refresh, 20000); setInterval(refreshPresence, 3000);
 </script>
 </body>
 </html>

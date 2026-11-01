@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 from assistant.gemini_engine import GeminiUnavailable, JarvisEngine  # noqa: E402
+from tools import presence  # noqa: E402
 from tools import status as st  # noqa: E402
 from tools.speak import speak  # noqa: E402
 from tools.sys_diagnose import SystemDiagnose  # noqa: E402
@@ -18,7 +19,7 @@ from tools.sys_diagnose import SystemDiagnose  # noqa: E402
 logging.basicConfig(level=config.LOG_LEVEL)
 logger = logging.getLogger("JarvisCore")
 
-app = FastAPI(title="Jarvis HA Control", version="1.6.0")
+app = FastAPI(title="Jarvis HA Control", version="1.7.0")
 jarvis = JarvisEngine()
 diagnose = SystemDiagnose()
 
@@ -63,6 +64,12 @@ LAST = {"report": None}
 @app.get("/api/status")
 async def get_status():
     return await st.build_status(diagnose)
+
+
+@app.get("/api/presence")
+async def get_presence():
+    """Présence seule, légère : le HUD l'appelle toutes les 3 s."""
+    return {"items": await presence.fast()}
 
 
 async def _make_report(analyse: bool) -> dict:

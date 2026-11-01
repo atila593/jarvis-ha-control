@@ -197,12 +197,8 @@ def classify(states: list) -> list:
                 place("weather", s)
 
     out["modules"].sort(key=lambda it: KIND_ORDER.get(it["kind"], 9))
-    # 3. Présence par zones (Radar Map Manager) : détectée automatiquement
-    for z in presence.zones(states):
-        out["presence"].append({
-            "entity_id": z["entity_id"], "name": z["name"].capitalize(),
-            "state": "on" if z["occupied"] else "off" if z["known"] else "unavailable",
-            "display": presence.describe(z), "level": "ok" if z["known"] else "warn", "kind": "other"})
+    # 3. Présence par zones (radar ESPHome) : détectée automatiquement
+    out["presence"].extend(presence.items(presence.zones(states)))
     return [{"id": gid, "title": title, "items": out[gid]} for gid, title in GROUPS]
 
 

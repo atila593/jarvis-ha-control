@@ -12,8 +12,9 @@ Assistant Gemini pour Home Assistant, avec HUD web (panneau latéral "Jarvis" vi
 - **Auto-Diagnostic** : état global, anomalies et analyse de Jarvis (si la clé Gemini est configurée).
 - Téléchargements : rapport HTML (imprimable en PDF), TXT, JSON, et visuel PNG à envoyer.
 
-## Présence (Radar Map Manager)
-Les zones créées avec Radar Map Manager (`binary_sensor.rmm_*_occupancy` et `sensor.rmm_*_count`) sont détectées automatiquement : panneau « Présence » dans le HUD, bloc dédié dans le contexte de Gemini (« qui est dans le salon ? »), et une phrase dans le rapport vocal. Le radar ne couvre que ses zones : Jarvis ne conclut jamais « personne dans l'appartement ». `hidden_entities` permet d'en masquer une.
+## Présence (radar ESPHome, ex. Apollo MTR-1)
+Jarvis lit directement les zones du radar (HLK-LD2450) : `sensor.<prefix>_zone_<n>_all_target_count`, sans intermédiaire. Détection automatique ; les zones non dessinées sur le radar (rectangle vide) et `Zone Type = Disabled` sont ignorées. Panneau « Présence » dans le HUD (rafraîchi toutes les 3 s), bloc dédié dans le contexte de Gemini (« qui est dans le salon ? »), et une phrase dans le rapport vocal. Le radar ne couvre que ses zones : Jarvis ne conclut jamais « personne dans l'appartement ». `hidden_entities` permet d'en masquer une.
+Réglages : `presence_zone_names` (noms dans l'ordre des zones 1, 2, 3, ex. `salon`, `salle a manger`) et `presence_prefix` (ex. `apollo_mtr_1_5444e4`, utile seulement avec plusieurs radars).
 
 ## Rapport vocal (Alexa)
 `POST /api/rapport` lance le diagnostic et le fait dire sur les enceintes (`speak_service` + `speak_targets`). Depuis Home Assistant : `rest_command` vers `http://<hostname-addon>:8099/api/rapport`, appelé par un script exposé à Alexa, puis une routine Alexa avec une phrase personnalisée.
@@ -42,3 +43,5 @@ Jarvis peut agir quand tu le demandes clairement (« allume la salle à manger �
 | `auto_discover` | `true` : détecte aussi caméras, aspirateur, capteurs ; `false` : surveille uniquement `extra_entities` |
 | `extra_entities` | Liste des entités à surveiller (classées automatiquement : modules, caméras/réseau, serveur/services) |
 | `hidden_entities` | Entités à masquer du tableau |
+| `presence_zone_names` | Noms des zones du radar, dans l'ordre (zone 1, zone 2...) ; sinon « Zone 1 »... |
+| `presence_prefix` | Préfixe des entités du radar, seulement si plusieurs radars |
