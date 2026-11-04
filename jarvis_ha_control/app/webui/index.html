@@ -37,6 +37,13 @@
   #voice { background:#0a7a4a; }
   #log { width:100%; flex:1; min-height:150px; margin-top:10px; overflow-y:auto; background:#030a10; border:1px solid var(--line); border-radius:10px; padding:10px; font-family:ui-monospace,monospace; font-size:13px; white-space:pre-wrap; }
   .me { color:#8fa; } .bot { color:var(--c); margin-bottom:8px; }
+  .pbtns { display:flex; gap:6px; margin-top:6px; }
+  .pbtns button { padding:6px 10px; font-size:12px; }
+  .pbtns .no { background:#3a1620; border:1px solid var(--ko); color:var(--ko); }
+  .pbtns .yes { background:#0a7a4a; }
+  .jrow { font-size:12px; color:#8fb3bd; padding:3px 0; border-bottom:1px solid #0a2531; overflow-wrap:anywhere; }
+  .jrow time { color:#5f8f9b; margin-right:6px; font-family:ui-monospace,monospace; }
+  .jrow.urgent { color:var(--ko); } .jrow.important, .jrow.proposition { color:var(--warn); } .jrow.auto, .jrow.action { color:var(--ok); }
   .bar { display:flex; gap:8px; width:100%; margin-top:8px; }
   input { flex:1; min-width:0; background:var(--panel); color:#e8fbff; border:1px solid var(--c); padding:10px; border-radius:8px; }
 
@@ -87,6 +94,7 @@
       <div class="col">
         <div class="panel"><h2>Serveur &amp; services</h2><div id="g-system"></div></div>
         <div class="panel"><h2>Météo &amp; énergie</h2><div id="g-weather"></div></div>
+        <div class="panel"><h2>Autonomie</h2><div id="g-auto"></div></div>
       </div>
     </div>
   </div>
@@ -209,7 +217,41 @@ async function refreshPresence(){
   try { const r = await fetch('api/presence'); const j = await r.json(); if((j.items||[]).length) renderItems($('g-presence'), j.items, false); }
   catch(e){}
 }
-refresh(); setInterval(refresh, 20000); setInterval(refreshPresence, 3000);
+
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!==undefined) e.textContent=text; return e; }
+async function decide(id, verb){
+  try {
+    const r = await fetch(`api/proposals/${id}/${verb}`,{method:'POST'});
+    const j = await r.json();
+    if(!r.ok) add('bot','Refusé : '+(j.detail||r.status));
+    else add('bot', verb==='approve' ? ('Proposition #'+id+' : '+(j.status==='executed'?'exécutée.':j.status==='obsolete'?'obsolète, la situation a changé.':'échec : '+(j.result||''))) : ('Proposition #'+id+' refusée.'));
+  } catch(e){ add('bot','Erreur réseau: '+e); }
+  refreshAuto(); setTimeout(refresh,1500);
+}
+async function refreshAuto(){
+  if(document.hidden) return;
+  const box=$('g-auto');
+  try {
+    const [a,p,j] = await Promise.all([fetch('api/autonomy').then(r=>r.json()), fetch('api/proposals').then(r=>r.json()), fetch('api/journal?limit=12').then(r=>r.json())]);
+    box.replaceChildren();
+    const head = el('div','sub-h', a.enabled ? ('Active · '+a.active.length+' alerte(s) en cours'+(a.quiet?' · mode nuit':'')) : 'Désactivée (autonomy_enabled)');
+    box.appendChild(head);
+    for(const it of p.items){
+      const row=el('div','item'); row.appendChild(el('div','dot warn'));
+      const txt=el('div'); txt.appendChild(el('b','', it.message));
+      txt.appendChild(el('span','v', it.action.domain+'.'+it.action.service+' → '+it.action.entity_id));
+      const btns=el('div','pbtns'); const y=el('button','yes','Approuver'), n=el('button','no','Refuser');
+      y.onclick=()=>decide(it.id,'approve'); n.onclick=()=>decide(it.id,'reject'); btns.append(y,n); txt.appendChild(btns);
+      row.appendChild(txt); box.appendChild(row);
+    }
+    if(!p.items.length) box.appendChild(el('div','empty','Aucune proposition en attente'));
+    box.appendChild(el('div','sub-h','Journal'));
+    for(const x of j.items){
+      const row=el('div','jrow '+x.severity); row.appendChild(el('time','', x.ts.slice(11,16))); row.appendChild(document.createTextNode(x.message)); box.appendChild(row);
+    }
+  } catch(e){ box.replaceChildren(el('div','empty','Autonomie indisponible')); }
+}
+refresh(); refreshAuto(); setInterval(refresh, 20000); setInterval(refreshPresence, 3000); setInterval(refreshAuto, 8000);
 </script>
 </body>
 </html>

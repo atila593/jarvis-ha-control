@@ -30,6 +30,19 @@ ACTIONS_ENABLED = bool(OPTIONS.get("actions_enabled", True))
 ALLOWED_DOMAINS = OPTIONS.get("allowed_domains") or ["light", "cover", "vacuum", "scene"]
 AUTO_SPEAK = bool(OPTIONS.get("auto_speak", False))
 
+# --- Autonomie (v2) ---------------------------------------------------------
+AUTONOMY_ENABLED = bool(OPTIONS.get("autonomy_enabled", False))
+AUTONOMY_INTERVAL = int(OPTIONS.get("autonomy_interval") or 30)
+AUTONOMY_RULES = OPTIONS.get("autonomy_rules") or []        # vide = toutes les règles
+AUTO_RULES = OPTIONS.get("auto_rules") or []                # règles autorisées à agir seules (urgence)
+APPROVERS = OPTIONS.get("approvers") or []                  # qui peut valider une proposition
+QUIET_START = (OPTIONS.get("quiet_start") or "23:00").strip()
+QUIET_END = (OPTIONS.get("quiet_end") or "07:00").strip()
+NOTIFY_SERVICE = (OPTIONS.get("notify_service") or "").strip()
+PROPOSAL_TTL_MIN = int(OPTIONS.get("proposal_ttl_minutes") or 120)
+DAILY_REPORT_TIME = (OPTIONS.get("daily_report_time") or "").strip()
+UNAVAILABLE_MIN = int(OPTIONS.get("unavailable_minutes") or 30)
+
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
 SUPERVISOR_URL = "http://supervisor"
 HA_API_URL = os.getenv("HA_API_URL", "http://supervisor/core/api")

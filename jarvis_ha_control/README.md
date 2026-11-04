@@ -45,3 +45,34 @@ Jarvis peut agir quand tu le demandes clairement (« allume la salle à manger �
 | `hidden_entities` | Entités à masquer du tableau |
 | `presence_zone_names` | Noms des zones du radar, dans l'ordre (zone 1, zone 2...) ; sinon « Zone 1 »... |
 | `presence_prefix` | Préfixe des entités du radar, seulement si plusieurs radars |
+
+## v2.0 — Autonomie (phase 1)
+
+Jarvis surveille la maison tout seul (lecture des états toutes les `autonomy_interval` secondes) et décide selon la gravité :
+
+| Gravité | Exemples | Comportement |
+|---|---|---|
+| **urgent** | fumée, gaz, CO, fuite d'eau | parle (même la nuit) + notifie, rappel toutes les 10 min (3 max). N'agit seul que si la règle est dans `auto_rules` |
+| **important** | porte de garage ouverte la nuit ou > 60 min, aspirateur en erreur, disque/mémoire > 95 %, CPU > 85 °C, vigilance météo rouge/orange | crée une **proposition** à valider dans le HUD, notifie, parle sauf la nuit |
+| **minor** | entité surveillée indisponible > 30 min | noté dans le journal, repris dans le rapport du matin |
+
+Règles disponibles (`autonomy_rules`, vide = toutes) : `safety_sensor`, `garage_open`, `vacuum_error`, `system_high`, `weather_alert`, `watched_unavailable`.
+
+### Garde-fous
+- **Rien n'est exécuté sans validation**, sauf règle listée dans `auto_rules` (vide par défaut).
+- Les actions passent par la même liste blanche que les commandes : jamais de serrure ni d'alarme, jamais de `toggle`.
+- À la validation, Jarvis **revérifie l'état** : si la situation a changé (porte déjà refermée), la proposition devient « obsolète » et rien n'est exécuté.
+- `approvers` : seuls ces utilisateurs HA peuvent valider. L'identité vient des en-têtes Ingress et n'est acceptée que si la requête vient du proxy Ingress (`172.30.32.2`).
+- Les propositions expirent après `proposal_ttl_minutes`.
+- Tout est écrit dans le journal (`/data/jarvis.db`, panneau « Autonomie » du HUD, `GET /api/journal`).
+- Les alertes en cours survivent à un redémarrage : pas de ré-annonce.
+
+### Options ajoutées
+`autonomy_enabled` (false par défaut), `autonomy_interval`, `autonomy_rules`, `auto_rules`, `approvers`, `quiet_start` / `quiet_end` (23:00 → 07:00), `notify_service` (ex. `notify.mobile_app_honor_v2`), `proposal_ttl_minutes`, `daily_report_time` (ex. `08:00`, vide = désactivé), `unavailable_minutes`.
+
+### API
+`GET /api/autonomy` · `GET /api/proposals?status=pending|all` · `POST /api/proposals/{id}/approve|reject` · `GET /api/journal?limit=`
+
+### Limites connues
+- La détection est par lecture périodique : latence maximale = `autonomy_interval` (30 s par défaut).
+- Pas encore de voix d'entrée, de reconnaissance du locuteur, ni de vision caméra : ce sont les phases suivantes.

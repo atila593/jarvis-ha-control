@@ -1,17 +1,25 @@
+import asyncio
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import config  # noqa: E402
-from fastapi import FastAPI, HTTPException  # noqa: E402
+from fastapi import FastAPI, HTTPException, Request  # noqa: E402
 from fastapi.responses import Response  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 from assistant.gemini_engine import GeminiUnavailable, JarvisEngine  # noqa: E402
+from autonomy import rules as arules  # noqa: E402
+from autonomy.engine import AutonomyEngine, Settings  # noqa: E402
+from autonomy.store import Store  # noqa: E402
 from tools import presence  # noqa: E402
+from tools.actions import ActionRunner  # noqa: E402
 from tools import status as st  # noqa: E402
 from tools.speak import speak  # noqa: E402
 from tools.sys_diagnose import SystemDiagnose  # noqa: E402
@@ -19,9 +27,82 @@ from tools.sys_diagnose import SystemDiagnose  # noqa: E402
 logging.basicConfig(level=config.LOG_LEVEL)
 logger = logging.getLogger("JarvisCore")
 
-app = FastAPI(title="Jarvis HA Control", version="1.7.0")
+VERSION = "2.0.0"
+INGRESS_IP = "172.30.32.2"  # seul le proxy Ingress du Supervisor peut valider une proposition
 jarvis = JarvisEngine()
 diagnose = SystemDiagnose()
+autonomy: AutonomyEngine | None = None
+_TZ = {"name": None}
+
+
+async def _local_now() -> datetime:
+    if not _TZ["name"]:
+        try:
+            _TZ["name"] = (await st._ha_get("config")).get("time_zone") or "UTC"
+        except Exception:
+            return datetime.now(ZoneInfo("UTC"))
+    return datetime.now(ZoneInfo(_TZ["name"]))
+
+
+async def _notify(title: str, message: str) -> None:
+    service = config.NOTIFY_SERVICE
+    if not service or "." not in service:
+        return
+    domain, name = service.split(".", 1)
+    headers = {"Authorization": f"Bearer {config.SUPERVISOR_TOKEN}"}
+    import httpx
+    async with httpx.AsyncClient(timeout=10) as http:
+        res = await http.post(f"{config.HA_API_URL}/services/{domain}/{name}", headers=headers,
+                              json={"title": title, "message": message})
+    res.raise_for_status()
+
+
+async def _execute(domain: str, service: str, entity_id: str) -> str:
+    """Passe par la même liste blanche que les commandes vocales/texte."""
+    return await ActionRunner({entity_id}).call_service(domain, service, entity_id)
+
+
+async def _speak_text(text: str) -> None:
+    await speak(text)
+
+
+async def _spoken_report() -> str:
+    return st.spoken_summary(await _make_report(True))
+
+
+def build_autonomy() -> AutonomyEngine:
+    params = arules.Params(
+        quiet_start=arules.parse_time(config.QUIET_START, arules.time(23, 0)),
+        quiet_end=arules.parse_time(config.QUIET_END, arules.time(7, 0)),
+        unavailable_min=config.UNAVAILABLE_MIN,
+        watched=list(config.EXTRA_ENTITIES),
+        hidden=list(config.HIDDEN_ENTITIES),
+        enabled=list(config.AUTONOMY_RULES),
+    )
+    settings = Settings(
+        enabled=config.AUTONOMY_ENABLED, interval=config.AUTONOMY_INTERVAL, auto_rules=list(config.AUTO_RULES),
+        approvers=list(config.APPROVERS), proposal_ttl_min=config.PROPOSAL_TTL_MIN,
+        daily_report_time=config.DAILY_REPORT_TIME,
+    )
+    return AutonomyEngine(
+        Store(), settings, params,
+        fetch_states=lambda: st._ha_get("states"), execute=_execute, speak=_speak_text,
+        notify=_notify, report=_spoken_report, local_now=_local_now,
+    )
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    global autonomy
+    autonomy = build_autonomy()
+    task = asyncio.create_task(autonomy.run()) if config.AUTONOMY_ENABLED else None
+    logger.info("Jarvis %s démarré — autonomie %s", VERSION, "ACTIVE" if task else "désactivée")
+    yield
+    if task:
+        task.cancel()
+
+
+app = FastAPI(title="Jarvis HA Control", version=VERSION, lifespan=lifespan)
 
 
 class CommandRequest(BaseModel):
@@ -127,6 +208,54 @@ async def download_report(format: str = "html"):
 @app.get("/api/diagnostics")
 async def get_diagnostics():
     return {"status": "success", "data": await diagnose.check_system_health()}
+
+
+def _approver(request: Request) -> str | None:
+    """Identité de l'approbateur, lue dans les en-têtes Ingress (posés par le Supervisor).
+
+    Si des `approvers` sont configurés, on exige que la requête vienne du proxy Ingress :
+    sans cela un autre add-on pourrait forger l'en-tête.
+    """
+    names = [n for n in (request.headers.get("X-Remote-User-Name"),
+                         request.headers.get("X-Remote-User-Display-Name")) if n]
+    if autonomy and autonomy.s.approvers:
+        trusted = os.getenv("JARVIS_DEV") == "1" or (request.client and request.client.host == INGRESS_IP)
+        if not trusted:
+            return None
+    ok = next((n for n in names if autonomy and autonomy.authorised(n)), None)
+    return ok or (names[0] if names else None)
+
+
+@app.get("/api/autonomy")
+async def get_autonomy():
+    return autonomy.snapshot(await _local_now())
+
+
+@app.get("/api/proposals")
+async def get_proposals(status: str = "pending"):
+    return {"items": autonomy.store.proposals(None if status == "all" else status)}
+
+
+async def _decide(pid: int, approve: bool, request: Request):
+    res = await autonomy.decide(pid, approve, _approver(request))
+    if not res["ok"]:
+        raise HTTPException(status_code=res["code"], detail=res["detail"])
+    return res
+
+
+@app.post("/api/proposals/{pid}/approve")
+async def approve_proposal(pid: int, request: Request):
+    return await _decide(pid, True, request)
+
+
+@app.post("/api/proposals/{pid}/reject")
+async def reject_proposal(pid: int, request: Request):
+    return await _decide(pid, False, request)
+
+
+@app.get("/api/journal")
+async def get_journal(limit: int = 30):
+    return {"items": autonomy.store.journal(min(max(limit, 1), 200))}
 
 
 webui = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webui")

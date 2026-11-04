@@ -6,3 +6,5 @@ Dépôt d'add-ons Home Assistant.
 
 ## Add-ons
 - **Jarvis HA Control** — assistant Gemini avec HUD web, lecture de l'état de la maison, diagnostic Supervisor et réponse vocale optionnelle sur Alexa/Echo.
+
+**v2.0.0** : moteur d'autonomie (surveillance, propositions à valider, journal). Voir `jarvis_ha_control/README.md`.
