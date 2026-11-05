@@ -30,28 +30,48 @@ class JarvisEngine:
     def __init__(self):
         self.client = genai.Client(api_key=config.GEMINI_API_KEY) if config.GEMINI_API_KEY else None
 
-    async def _generate(self, model: str, contents: str, tools=None):
+    async def _generate(self, model: str, contents, tools=None, system: str | None = None):
         return await self.client.aio.models.generate_content(
             model=model,
             contents=contents,
             config=types.GenerateContentConfig(
-                system_instruction=system_prompt(bool(tools)),
+                system_instruction=system or system_prompt(bool(tools)),
                 tools=tools or None,
             ),
         )
 
-    async def process_command(self, prompt: str):
-        """Retourne (texte, actions exécutées)."""
+    async def process_command(self, prompt: str, who: str | None = None, role: str = "admin",
+                              toolbox=None, facts: list | None = None):
+        """Retourne (texte, actions exécutées). `role` : admin / member / guest (guest = lecture seule)."""
         if not self.client:
             return "Clé API Gemini non configurée : renseigne gemini_api_key dans les options de l'add-on.", []
 
         context, known = await self._fetch_ha_states()
-        tools, runner = None, None
-        if config.ACTIONS_ENABLED and allowed_domains() and known:
+        tools, runner = [], None
+        can_act = role in ("admin", "member")
+        if can_act and config.ACTIONS_ENABLED and allowed_domains() and known:
             runner = ActionRunner(known)
-            tools = [runner.call_service]
-        text = await self.ask(f"[Contexte domotique actuel]\n{context}\n\n[Requête]\n{prompt}", tools)
+            tools.append(runner.call_service)
+        extra = toolbox.tools() if (toolbox and can_act) else []
+        tools += extra
+        engineer = any(t.__name__.startswith("propose_") for t in extra)
+        memory = any(t.__name__ == "remember" for t in extra)
+        system = system_prompt(bool(runner), engineer=engineer, memory=memory)
+
+        mem = ""
+        if facts:
+            mem = "\n\n[Mémoire sur " + (who or "la personne") + "]\n" + "\n".join(f"- {f}" for f in facts)
+        who_line = f"\n\n[Interlocuteur] {who} (rôle : {role})" if who else ""
+        text = await self.ask(f"[Contexte domotique actuel]\n{context}{mem}{who_line}\n\n[Requête]\n{prompt}",
+                              tools or None, system)
         return text, (runner.done if runner else [])
+
+    async def describe_image(self, image: bytes, prompt: str) -> str:
+        """Analyse d'une image de caméra (utilisée par la vision)."""
+        if not self.client:
+            raise GeminiUnavailable("clé API Gemini non configurée")
+        part = types.Part.from_bytes(data=image, mime_type="image/jpeg")
+        return await self.ask([part, prompt])
 
     async def analyse(self, report_text: str) -> str:
         if not self.client:
@@ -63,7 +83,7 @@ class JarvisEngine:
             "dans Home Assistant (à corriger ou retirer de la liste), pas qu'une intégration est cassée. Pas de markdown."
         )
 
-    async def ask(self, contents: str, tools=None) -> str:
+    async def ask(self, contents, tools=None, system: str | None = None) -> str:
         models = [config.GEMINI_MODEL]
         if config.GEMINI_FALLBACK_MODEL and config.GEMINI_FALLBACK_MODEL != config.GEMINI_MODEL:
             models.append(config.GEMINI_FALLBACK_MODEL)
@@ -72,7 +92,7 @@ class JarvisEngine:
         for model in models:
             for attempt in range(ATTEMPTS):
                 try:
-                    response = await asyncio.wait_for(self._generate(model, contents, tools), timeout=TIMEOUT)
+                    response = await asyncio.wait_for(self._generate(model, contents, tools, system), timeout=TIMEOUT)
                     return (response.text or "").strip() or "Je n'ai pas de réponse."
                 except asyncio.TimeoutError:
                     last_error = "délai dépassé"

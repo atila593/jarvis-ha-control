@@ -46,3 +46,19 @@ UNAVAILABLE_MIN = int(OPTIONS.get("unavailable_minutes") or 30)
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
 SUPERVISOR_URL = "http://supervisor"
 HA_API_URL = os.getenv("HA_API_URL", "http://supervisor/core/api")
+
+# --- v3 : ingénieur HA, vision, mémoire, voix ---------------------------------
+ENGINEER_ENABLED = bool(OPTIONS.get("engineer_enabled", False))
+ENGINEER_EDIT_EXISTING = bool(OPTIONS.get("engineer_edit_existing", False))
+STALE_DAYS = int(OPTIONS.get("stale_days") or 7)
+VISION_ENABLED = bool(OPTIONS.get("vision_enabled", False))
+FRIGATE_URL = (OPTIONS.get("frigate_url") or "").strip()
+VISION_LABELS = OPTIONS.get("vision_labels") or ["person"]
+VISION_CAMERAS = OPTIONS.get("vision_cameras") or []
+VISION_DAILY_BUDGET = int(OPTIONS.get("vision_daily_budget") or 60)
+VISION_COOLDOWN_MIN = int(OPTIONS.get("vision_cooldown_minutes") or 5)
+MEMORY_ENABLED = bool(OPTIONS.get("memory_enabled", False))
+VOICE_ENABLED = bool(OPTIONS.get("voice_enabled", False))
+VOICE_PIN = (OPTIONS.get("voice_pin") or "").strip()
+USER_ROLES = OPTIONS.get("user_roles") or []                 # ex. "Olivier:admin", "Sarah:member"
+HA_WS_URL = os.getenv("HA_WS_URL", "ws://supervisor/core/websocket")

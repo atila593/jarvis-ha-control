@@ -35,7 +35,7 @@ class AutonomyEngine:
     """Les dépendances (réseau, voix, notifications) sont injectées : le moteur se teste sans HA."""
 
     def __init__(self, store: Store, settings: Settings, params: rules.Params, *,
-                 fetch_states, execute, speak, notify, report, local_now):
+                 fetch_states, execute, speak, notify, report, local_now, handlers=None, vision=None):
         self.store = store
         self.s = settings
         self.params = params
@@ -45,6 +45,8 @@ class AutonomyEngine:
         self.notify = notify               # async (title, message) -> None
         self.report = report               # async () -> str  (texte parlé du diagnostic)
         self.local_now = local_now         # async () -> datetime (fuseau local)
+        self.handlers = handlers or {}     # type d'action -> async (action: dict) -> str ("OK ..." si réussi)
+        self.vision = vision               # Vision | None
         self.last_tick: str | None = None
         self.states_by_id: dict = {}
         self.active: dict = {
@@ -68,6 +70,12 @@ class AutonomyEngine:
         self.states_by_id = {s.get("entity_id"): s for s in states}
         findings = rules.evaluate(states, now, self.params)
         await self._process(findings, now)
+        if self.vision:
+            try:
+                for f in await self.vision.poll(now):
+                    await self._announce(f, now)
+            except Exception:
+                logger.exception("Erreur de la vision (les règles continuent)")
         self._expire(now)
         await self._daily_report(now)
         self.last_tick = now.isoformat(timespec="seconds")
@@ -171,7 +179,17 @@ class AutonomyEngine:
                 return {"ok": True, "status": "obsolete"}
 
         a = prop["action"]
-        result = await self.execute(a["domain"], a["service"], a["entity_id"])
+        kind = a.get("type", "service")
+        if kind == "service":
+            result = await self.execute(a["domain"], a["service"], a["entity_id"])
+        elif kind in self.handlers:
+            try:
+                result = await self.handlers[kind](a)
+            except Exception as e:
+                logger.exception("Échec du gestionnaire %s", kind)
+                result = f"ERREUR : {e}"
+        else:
+            result = f"ERREUR : type d'action inconnu ({kind})."
         status = "executed" if result.startswith("OK") else "failed"
         self.store.set_proposal(pid, status, decided_by=who, result=result)
         self.store.log("action" if status == "executed" else "erreur", prop["rule"],

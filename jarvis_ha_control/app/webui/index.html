@@ -228,30 +228,52 @@ async function decide(id, verb){
   } catch(e){ add('bot','Erreur réseau: '+e); }
   refreshAuto(); setTimeout(refresh,1500);
 }
+let hygieneCount = 0;
+async function refreshHygiene(){
+  try { const h = await fetch('api/hygiene').then(r=>r.json()); hygieneCount = h.count || 0; } catch(e){}
+}
+async function undoChange(id){
+  try {
+    const r = await fetch(`api/changes/${id}/undo`,{method:'POST'}); const j = await r.json();
+    add('bot', r.ok ? j.result : 'Annulation refusée : '+(j.detail||r.status));
+  } catch(e){ add('bot','Erreur réseau: '+e); }
+  refreshAuto();
+}
 async function refreshAuto(){
   if(document.hidden) return;
   const box=$('g-auto');
   try {
-    const [a,p,j] = await Promise.all([fetch('api/autonomy').then(r=>r.json()), fetch('api/proposals').then(r=>r.json()), fetch('api/journal?limit=12').then(r=>r.json())]);
+    const [a,p,j,ch] = await Promise.all([fetch('api/autonomy').then(r=>r.json()), fetch('api/proposals').then(r=>r.json()), fetch('api/journal?limit=12').then(r=>r.json()), fetch('api/changes?limit=5').then(r=>r.json())]);
     box.replaceChildren();
     const head = el('div','sub-h', a.enabled ? ('Active · '+a.active.length+' alerte(s) en cours'+(a.quiet?' · mode nuit':'')) : 'Désactivée (autonomy_enabled)');
     box.appendChild(head);
     for(const it of p.items){
       const row=el('div','item'); row.appendChild(el('div','dot warn'));
       const txt=el('div'); txt.appendChild(el('b','', it.message));
-      txt.appendChild(el('span','v', it.action.domain+'.'+it.action.service+' → '+it.action.entity_id));
+      txt.appendChild(el('span','v', it.action.summary ? ('Configuration HA · '+(it.action.type||'')) : (it.action.domain+'.'+it.action.service+' → '+it.action.entity_id)));
       const btns=el('div','pbtns'); const y=el('button','yes','Approuver'), n=el('button','no','Refuser');
       y.onclick=()=>decide(it.id,'approve'); n.onclick=()=>decide(it.id,'reject'); btns.append(y,n); txt.appendChild(btns);
       row.appendChild(txt); box.appendChild(row);
     }
     if(!p.items.length) box.appendChild(el('div','empty','Aucune proposition en attente'));
+    const applied = ch.items.filter(c => ['applied','undone','rolled_back','failed','irreversible'].includes(c.status));
+    if(applied.length){
+      box.appendChild(el('div','sub-h','Modifications de Jarvis'));
+      for(const c of applied){
+        const row=el('div','jrow'); row.appendChild(el('time','', c.ts.slice(11,16)));
+        row.appendChild(document.createTextNode(c.op+' '+c.kind+' '+c.object_id+' — '+c.status+' '));
+        if(c.status==='applied'){ const u=el('button','no','Annuler'); u.style.cssText='padding:2px 8px;font-size:11px'; u.onclick=()=>undoChange(c.id); row.appendChild(u); }
+        box.appendChild(row);
+      }
+    }
+    if(hygieneCount>0) box.appendChild(el('div','sub-h', hygieneCount+' entité(s) fantôme(s) · demande « liste les entités fantômes » à Jarvis'));
     box.appendChild(el('div','sub-h','Journal'));
     for(const x of j.items){
       const row=el('div','jrow '+x.severity); row.appendChild(el('time','', x.ts.slice(11,16))); row.appendChild(document.createTextNode(x.message)); box.appendChild(row);
     }
   } catch(e){ box.replaceChildren(el('div','empty','Autonomie indisponible')); }
 }
-refresh(); refreshAuto(); setInterval(refresh, 20000); setInterval(refreshPresence, 3000); setInterval(refreshAuto, 8000);
+refresh(); refreshHygiene().then(refreshAuto); setInterval(refreshHygiene, 300000); setInterval(refresh, 20000); setInterval(refreshPresence, 3000); setInterval(refreshAuto, 8000);
 </script>
 </body>
 </html>

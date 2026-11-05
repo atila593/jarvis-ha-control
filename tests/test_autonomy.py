@@ -59,6 +59,18 @@ def test_system_high_ignores_swap_and_battery():
     assert got == ["sensor.localhost_temperature_package_id_0", "sensor.localhost_utilisation_disque_data"]
 
 
+def test_cpu_percentages_never_trigger_system_high():
+    # Régression : « CPU des conteneurs » = 222 % est normal (somme des cœurs), ce n'était pas une alerte.
+    states = [
+        st("sensor.localhost_utilisation_cpu_des_conteneurs", "222", unit_of_measurement="%"),
+        st("sensor.localhost_utilisation_du_processeur", "99", unit_of_measurement="%"),
+        st("sensor.localhost_utilisation_de_la_memoire", "96", unit_of_measurement="%", friendly_name="Mémoire"),
+        st("sensor.localhost_utilisation_de_la_memoire_des_conteneurs", "180", unit_of_measurement="%"),
+    ]
+    got = [f.entity_id for f in rules.evaluate(states, DAY, rules.Params())]
+    assert got == ["sensor.localhost_utilisation_de_la_memoire"]
+
+
 def test_hidden_and_disabled_rules():
     s = st("binary_sensor.fumee", "on", device_class="smoke", friendly_name="Fumée")
     assert rules.evaluate([s], DAY, rules.Params(hidden=["binary_sensor.fumee"])) == []

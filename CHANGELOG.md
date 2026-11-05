@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.0
+- Ingénieur HA : propositions de création/modification/suppression d'automations et scripts, validation stricte, vérification, retour arrière automatique, annulation.
+- Nettoyage d'entités fantômes (refus si référencées), `GET /api/hygiene`.
+- Vision Frigate -> Gemini avec budget quotidien, délai par caméra, reconnaissance Frigate gratuite.
+- Rôles (admin / member / guest), validation vocale par code avec blocage, mémoire par personne.
+- Tout est désactivé par défaut ; 54 tests automatisés.
+
+## 2.0.1
+- Correctif : la règle `system_high` ne regarde plus que disque et mémoire (le CPU des conteneurs dépasse 100 % normalement : faux positif).
+
 ## 2.0.0
 - Moteur d'autonomie : surveillance périodique, gravité urgent / important / minor.
 - Propositions d'actions à valider (HUD), contrôle de l'approbateur, vérification d'état avant exécution, expiration.

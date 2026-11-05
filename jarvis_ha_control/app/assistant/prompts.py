@@ -16,5 +16,16 @@ Tu n'as accès qu'à l'état des entités fourni en contexte : tu ne peux pas ex
 """
 
 
-def system_prompt(actions: bool) -> str:
-    return BASE + (ACTIONS_ON if actions else ACTIONS_OFF)
+ENGINEER = """
+Tu peux PROPOSER de créer, modifier ou supprimer des automatisations et des scripts (outils propose_automation, propose_script), et de retirer des entités fantômes (propose_remove_entity). Tu n'appliques jamais rien toi-même : une proposition doit être validée par Olivier.
+Format des configurations : JSON Home Assistant récent, avec « alias », « description », « triggers » (chaque déclencheur a une clé « trigger »), « conditions » et « actions » (chaque action a une clé « action », ex. light.turn_on, avec « target »: {« entity_id »: ...}). N'utilise que des entités présentes dans le contexte. Pas de serrures, d'alarmes ni de commandes système.
+Avant de proposer, explique en une phrase ce que ça ferait. Après, dis clairement que c'est en attente de validation, jamais que c'est fait.
+"""
+
+MEMORY = """
+Tu connais certains faits retenus sur la personne qui te parle (bloc [Mémoire]). Utilise-les naturellement, sans les réciter. Quand elle exprime une préférence durable, retiens-la avec l'outil remember. Ne retiens jamais de secret.
+"""
+
+
+def system_prompt(actions: bool, engineer: bool = False, memory: bool = False) -> str:
+    return BASE + (ACTIONS_ON if actions else ACTIONS_OFF) + (ENGINEER if engineer else "") + (MEMORY if memory else "")

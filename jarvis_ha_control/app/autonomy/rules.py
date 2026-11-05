@@ -13,7 +13,9 @@ SAFETY_CLASSES = {
     "moisture": "une fuite d'eau",
     "safety": "un danger",
 }
-SYSTEM_METRIC_KEYS = ("localhost", "stockage", "storage", "disk", "memoire", "nas")
+# Uniquement ce qui sature vraiment : espace disque et mémoire. Jamais les CPU (somme sur plusieurs cœurs : 222 % est normal).
+SYSTEM_METRIC_KEYS = ("stockage", "storage", "disk", "disque", "memoire", "memory", "nas")
+SYSTEM_EXCLUDE = ("echange", "swap", "conteneur", "container", "processeur", "cpu")
 BAD_ALERT = {"rouge": "rouge", "red": "rouge", "orange": "orange"}
 
 ALL_RULES = (
@@ -136,7 +138,7 @@ def evaluate(states: list, now_local: datetime, p: Params) -> list[Finding]:
             v, unit = _num(state), attrs.get("unit_of_measurement")
             low = eid.lower()
             if v is not None and unit == "%" and dclass != "battery" and any(k in low for k in SYSTEM_METRIC_KEYS) \
-                    and "echange" not in low and "swap" not in low and v >= 95:
+                    and not any(x in low for x in SYSTEM_EXCLUDE) and v >= 95:
                 out.append(Finding("system_high", eid, "important", f"{name} est à {v:.0f} pour cent."))
             elif v is not None and "temperature_package" in low and v >= 85:
                 out.append(Finding("system_high", eid, "important", f"Le processeur chauffe : {v:.0f} degrés."))

@@ -76,3 +76,43 @@ Règles disponibles (`autonomy_rules`, vide = toutes) : `safety_sensor`, `garage
 ### Limites connues
 - La détection est par lecture périodique : latence maximale = `autonomy_interval` (30 s par défaut).
 - Pas encore de voix d'entrée, de reconnaissance du locuteur, ni de vision caméra : ce sont les phases suivantes.
+
+## v3.0 — Ingénieur HA, vision, mémoire, voix (tout désactivé par défaut)
+
+Chaque fonction a son interrupteur : active-les une par une.
+
+| Option | Fonction |
+|---|---|
+| `engineer_enabled` | Jarvis peut **proposer** de créer/modifier/supprimer des automations et scripts, et de retirer des entités fantômes |
+| `engineer_edit_existing` | autorise aussi à modifier/supprimer **tes** automations (sinon uniquement celles que Jarvis a créées) |
+| `vision_enabled` + `frigate_url` | analyse des événements Frigate par Gemini (ex. `http://192.168.1.2:5000`) |
+| `memory_enabled` | retient des préférences par personne |
+| `voice_enabled` + `voice_pin` | validation vocale (« jarvis oui 1234 ») |
+| `user_roles` | `["Olivier:admin", "Sarah:member"]` |
+
+### Ingénieur HA
+- Gemini ne fait que **proposer** (outils `propose_automation`, `propose_script`, `propose_remove_entity`). Rien n'est écrit tant qu'un approbateur n'a pas validé.
+- Validation stricte, à la proposition **et** à l'application : taille, entités qui existent, **services interdits** (`lock`, `alarm_control_panel`, `shell_command`, `python_script`, `hassio`, `rest_command`, redémarrage de HA).
+- Application via l'API de configuration de HA, puis **vérification** que l'objet est chargé et disponible ; sinon **retour arrière automatique**.
+- Chaque modification garde son état « avant » : bouton **Annuler** dans le HUD, `POST /api/changes/{id}/undo`, ou « jarvis annule ça + code ».
+- Les objets créés sont préfixés `[Jarvis]` et signés dans leur description.
+- Retrait d'entité : refusé si elle fonctionne ou si une automation, un script ou un dashboard la cite. **Irréversible** (indiqué dans la proposition). Les automations définies en YAML ne sont pas lisibles : le nombre est signalé.
+- `GET /api/hygiene` : entités fantômes (restaurées, ou indisponibles depuis `stale_days`).
+
+### Vision (Frigate)
+- Une personne déjà reconnue par Frigate (`sub_label`) n'envoie **aucune** image à Gemini.
+- Délai entre deux analyses d'une même caméra, **budget quotidien** `vision_daily_budget` (60 par défaut) pour ménager le quota gratuit.
+- Gemini décrit la scène (jamais d'identification par le visage) et note la menace de 0 à 2. Urgence de jour : jamais ; la nuit seulement si menace 2.
+- Frigate injoignable : une seule note dans le journal, puis retour à la normale signalé.
+
+### Voix et rôles
+- Rôles : **admin** (valide, propose des automations), **member** (commandes + mémoire), **guest** (lecture seule). Panneau Jarvis (Ingress) = admin par défaut ; appel extérieur : rôle selon `user_roles`, inconnu = guest.
+- Validation vocale : exige `voice_enabled`, `voice_pin` **et** le rôle admin. Un « oui » seul ne valide jamais rien. 5 codes faux = blocage 5 minutes.
+- `docs/ha-voice-package.yaml` : exemple à copier (rest_command + déclencheur de conversation).
+- **Pas encore faits** : mot d'éveil et reconnaissance du locuteur (ils demandent un micro/satellite pour être développés et testés). En attendant, c'est toi qui déclares `who` dans l'automation.
+
+### Mémoire
+Faits courts par personne (`remember`), jamais de mot de passe, code ou donnée bancaire. `GET /api/memory`, `DELETE /api/memory/{id}` (panneau uniquement).
+
+### Nouvelles routes
+`POST /api/voice/ask` · `GET /api/changes` · `POST /api/changes/{id}/undo` · `GET /api/hygiene` · `GET|DELETE /api/memory`

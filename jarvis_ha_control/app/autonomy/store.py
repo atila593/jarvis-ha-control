@@ -36,6 +36,24 @@ CREATE TABLE IF NOT EXISTS active (
     last_notified TEXT NOT NULL,
     notified_count INTEGER NOT NULL DEFAULT 1
 );
+CREATE TABLE IF NOT EXISTS changes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    object_id TEXT NOT NULL,
+    op TEXT NOT NULL,
+    before TEXT,
+    after TEXT,
+    status TEXT NOT NULL,
+    proposal_id INTEGER,
+    note TEXT
+);
+CREATE TABLE IF NOT EXISTS facts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT NOT NULL,
+    person TEXT NOT NULL,
+    fact TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS meta (
     k TEXT PRIMARY KEY,
     v TEXT
@@ -49,7 +67,7 @@ def _now() -> str:
 
 class Store:
     def __init__(self, path: str | None = None):
-        self.path = path or DB_PATH
+        self.path = path or os.getenv("JARVIS_DB") or DB_PATH
         self._lock = threading.Lock()
         self._db = sqlite3.connect(self.path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
@@ -167,3 +185,66 @@ class Store:
         with self._lock:
             self._db.execute("INSERT INTO meta (k, v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (k, v))
             self._db.commit()
+
+    # --- modifications de configuration (annulables) -----------------------
+    def add_change(self, kind: str, object_id: str, op: str, before, after, proposal_id: int | None = None) -> int:
+        with self._lock:
+            cur = self._db.execute(
+                "INSERT INTO changes (ts, kind, object_id, op, before, after, status, proposal_id) VALUES (?,?,?,?,?,?,?,?)",
+                (_now(), kind, object_id, op, json.dumps(before), json.dumps(after), "applying", proposal_id),
+            )
+            self._db.commit()
+            return cur.lastrowid
+
+    def set_change(self, cid: int, status: str, note: str | None = None) -> None:
+        with self._lock:
+            self._db.execute("UPDATE changes SET status=?, note=COALESCE(?, note) WHERE id=?", (status, note, cid))
+            self._db.commit()
+
+    def get_change(self, cid: int) -> dict | None:
+        with self._lock:
+            row = self._db.execute("SELECT * FROM changes WHERE id=?", (cid,)).fetchone()
+        return self._change(row) if row else None
+
+    def changes(self, limit: int = 30) -> list[dict]:
+        with self._lock:
+            rows = self._db.execute("SELECT * FROM changes ORDER BY id DESC LIMIT ?", (int(limit),)).fetchall()
+        return [self._change(r) for r in rows]
+
+    def last_applied_change(self) -> dict | None:
+        with self._lock:
+            row = self._db.execute("SELECT * FROM changes WHERE status='applied' ORDER BY id DESC LIMIT 1").fetchone()
+        return self._change(row) if row else None
+
+    @staticmethod
+    def _change(row) -> dict:
+        d = dict(row)
+        d["before"] = json.loads(d["before"]) if d["before"] else None
+        d["after"] = json.loads(d["after"]) if d["after"] else None
+        return d
+
+    # --- mémoire (faits retenus par personne) ------------------------------
+    def add_fact(self, person: str, fact: str) -> int:
+        with self._lock:
+            dup = self._db.execute("SELECT id FROM facts WHERE person=? AND lower(fact)=lower(?)", (person, fact)).fetchone()
+            if dup:
+                return dup["id"]
+            cur = self._db.execute("INSERT INTO facts (ts, person, fact) VALUES (?,?,?)", (_now(), person, fact))
+            self._db.commit()
+            return cur.lastrowid
+
+    def facts(self, person: str | None = None, limit: int = 40) -> list[dict]:
+        q, args = "SELECT * FROM facts", []
+        if person:
+            q += " WHERE person=? OR person='*'"
+            args.append(person)
+        q += " ORDER BY id DESC LIMIT ?"
+        args.append(int(limit))
+        with self._lock:
+            return [dict(r) for r in self._db.execute(q, args).fetchall()]
+
+    def delete_fact(self, fid: int) -> bool:
+        with self._lock:
+            cur = self._db.execute("DELETE FROM facts WHERE id=?", (fid,))
+            self._db.commit()
+            return cur.rowcount > 0

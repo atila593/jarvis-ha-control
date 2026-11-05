@@ -2,8 +2,6 @@ import os
 import sys
 import tempfile
 
-os.environ["JARVIS_DEV"] = "1"
-os.environ["JARVIS_DB"] = os.path.join(tempfile.mkdtemp(), "api.db")
 os.environ["OPTIONS_PATH"] = "/nonexistent.json"
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "jarvis_ha_control", "app"))
 

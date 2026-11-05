@@ -1,0 +1,30 @@
+# Jarvis — branchement de la voix sur Assist (Voice PE, satellite Wyoming, application HA).
+# À COPIER à la main dans ta configuration HA : l'add-on ne modifie jamais ta config.
+#
+# Principe : Assist reconnaît la phrase « jarvis … », la confie à l'add-on, et lit sa réponse.
+# Validation vocale : « jarvis oui 1234 » (ton code `voice_pin`). Sans `voice_pin`, la validation vocale reste coupée.
+
+rest_command:
+  jarvis_ask:
+    url: "http://717adb6e-jarvis-ha-control:8099/api/voice/ask"
+    method: post
+    content_type: "application/json"
+    timeout: 30
+    payload: '{"text": {{ text | tojson }}, "who": {{ who | tojson }}}'
+
+automation:
+  - alias: "Jarvis — conversation vocale"
+    description: "Phrases commençant par « jarvis » envoyées à Jarvis."
+    triggers:
+      - trigger: conversation
+        command:
+          - "jarvis {phrase}"
+    actions:
+      - action: rest_command.jarvis_ask
+        data:
+          text: "{{ trigger.slots.phrase }}"
+          # Sans reconnaissance du locuteur, Jarvis ne sait pas qui parle : on le déclare ici.
+          # Mets le prénom d'un utilisateur de `user_roles`. Un prénom « admin » + `voice_pin` = validations vocales possibles.
+          who: "Olivier"
+        response_variable: jarvis
+      - set_conversation_response: "{{ jarvis.content.response }}"

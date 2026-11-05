@@ -15,9 +15,14 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 from assistant.gemini_engine import GeminiUnavailable, JarvisEngine  # noqa: E402
+from autonomy import access  # noqa: E402
 from autonomy import rules as arules  # noqa: E402
 from autonomy.engine import AutonomyEngine, Settings  # noqa: E402
+from autonomy.engineer import Engineer  # noqa: E402
+from autonomy.ha import HaClient  # noqa: E402
 from autonomy.store import Store  # noqa: E402
+from autonomy.vision import Vision, VisionSettings  # noqa: E402
+from tools.toolbox import Toolbox  # noqa: E402
 from tools import presence  # noqa: E402
 from tools.actions import ActionRunner  # noqa: E402
 from tools import status as st  # noqa: E402
@@ -27,11 +32,14 @@ from tools.sys_diagnose import SystemDiagnose  # noqa: E402
 logging.basicConfig(level=config.LOG_LEVEL)
 logger = logging.getLogger("JarvisCore")
 
-VERSION = "2.0.0"
+VERSION = "3.0.0"
 INGRESS_IP = "172.30.32.2"  # seul le proxy Ingress du Supervisor peut valider une proposition
 jarvis = JarvisEngine()
 diagnose = SystemDiagnose()
 autonomy: AutonomyEngine | None = None
+engineer: Engineer | None = None
+gate: access.VoiceGate | None = None
+ROLES: dict = {}
 _TZ = {"name": None}
 
 
@@ -84,11 +92,43 @@ def build_autonomy() -> AutonomyEngine:
         approvers=list(config.APPROVERS), proposal_ttl_min=config.PROPOSAL_TTL_MIN,
         daily_report_time=config.DAILY_REPORT_TIME,
     )
-    return AutonomyEngine(
-        Store(), settings, params,
+    store = Store()
+    ha = HaClient(config.HA_API_URL, config.HA_WS_URL, config.SUPERVISOR_TOKEN)
+    global engineer, gate, ROLES
+    engineer = Engineer(store, ha, edit_existing=config.ENGINEER_EDIT_EXISTING)
+    ROLES = access.parse_roles(config.USER_ROLES)
+
+    async def get_json(url, params):
+        import httpx
+        async with httpx.AsyncClient(timeout=10) as http:
+            res = await http.get(url, params=params)
+        res.raise_for_status()
+        return res.json()
+
+    async def get_bytes(url):
+        import httpx
+        async with httpx.AsyncClient(timeout=15) as http:
+            res = await http.get(url)
+        return res.content if res.status_code == 200 else None
+
+    vision = Vision(
+        store,
+        VisionSettings(enabled=config.VISION_ENABLED, frigate_url=config.FRIGATE_URL, labels=list(config.VISION_LABELS),
+                       cameras=list(config.VISION_CAMERAS), daily_budget=config.VISION_DAILY_BUDGET,
+                       cooldown_min=config.VISION_COOLDOWN_MIN),
+        params.quiet_start, params.quiet_end,
+        get_json=get_json, get_bytes=get_bytes, describe=jarvis.describe_image,
+    ) if config.VISION_ENABLED else None
+
+    engine = AutonomyEngine(
+        store, settings, params,
         fetch_states=lambda: st._ha_get("states"), execute=_execute, speak=_speak_text,
         notify=_notify, report=_spoken_report, local_now=_local_now,
+        handlers={"config_change": engineer.apply_change, "entity_remove": engineer.remove_entity},
+        vision=vision,
     )
+    gate = access.VoiceGate(engine, engineer, config.VOICE_PIN, config.VOICE_ENABLED)
+    return engine
 
 
 @asynccontextmanager
@@ -108,16 +148,41 @@ app = FastAPI(title="Jarvis HA Control", version=VERSION, lifespan=lifespan)
 class CommandRequest(BaseModel):
     prompt: str
     speak: bool | None = None
+    who: str | None = None
 
 
 class SpeakRequest(BaseModel):
     text: str
 
 
+def _trusted(request: Request) -> bool:
+    return os.getenv("JARVIS_DEV") == "1" or bool(request.client and request.client.host == INGRESS_IP)
+
+
+def _identity(request: Request, body_who: str | None = None) -> tuple[str | None, str]:
+    """(qui, rôle). Via le panneau Jarvis (Ingress, réservé aux admins HA) : admin par défaut.
+    Appel extérieur (automation, satellite) : le rôle vient de `user_roles`, inconnu = lecture seule."""
+    header = request.headers.get("X-Remote-User-Display-Name") or request.headers.get("X-Remote-User-Name")
+    if _trusted(request) and not body_who:
+        return header, access.role_of(header, ROLES, default="admin")
+    return body_who, access.role_of(body_who, ROLES, default="guest")
+
+
+def _toolbox(who, role):
+    return Toolbox(engineer, autonomy.store, who, role, engineer_on=config.ENGINEER_ENABLED,
+                   memory_on=config.MEMORY_ENABLED, stale_days=config.STALE_DAYS)
+
+
+async def _ask_jarvis(prompt: str, who, role):
+    facts = [f["fact"] for f in autonomy.store.facts(who)] if (config.MEMORY_ENABLED and who) else None
+    return await jarvis.process_command(prompt, who=who, role=role, toolbox=_toolbox(who, role), facts=facts)
+
+
 @app.post("/api/command")
-async def handle_command(req: CommandRequest):
+async def handle_command(req: CommandRequest, request: Request):
+    who, role = _identity(request, req.who)
     try:
-        response, actions = await jarvis.process_command(req.prompt)
+        response, actions = await _ask_jarvis(req.prompt, who, role)
     except GeminiUnavailable as e:
         logger.error("%s", e)
         raise HTTPException(status_code=503, detail=str(e))
@@ -256,6 +321,63 @@ async def reject_proposal(pid: int, request: Request):
 @app.get("/api/journal")
 async def get_journal(limit: int = 30):
     return {"items": autonomy.store.journal(min(max(limit, 1), 200))}
+
+
+class VoiceRequest(BaseModel):
+    text: str
+    who: str | None = None
+
+
+@app.post("/api/voice/ask")
+async def voice_ask(req: VoiceRequest, request: Request):
+    """Point d'entrée vocal (satellite / Assist) : valide par code, sinon répond comme une conversation normale."""
+    who, role = _identity(request, req.who)
+    handled = await gate.handle(req.text, who, role)
+    if handled is not None:
+        return {"status": "success", "response": handled, "handled": "voice_gate"}
+    try:
+        response, actions = await _ask_jarvis(req.text, who, role)
+    except GeminiUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return {"status": "success", "response": response, "actions": actions, "handled": "chat"}
+
+
+@app.get("/api/changes")
+async def get_changes(limit: int = 20):
+    return {"items": autonomy.store.changes(min(max(limit, 1), 100))}
+
+
+@app.post("/api/changes/{cid}/undo")
+async def undo_change(cid: int, request: Request):
+    user = _approver(request)
+    if not autonomy.authorised(user):
+        raise HTTPException(status_code=403, detail="Seul un approbateur autorisé peut annuler.")
+    result = await engineer.undo(cid)
+    if result.startswith("ERREUR"):
+        raise HTTPException(status_code=409, detail=result)
+    return {"status": "success", "result": result}
+
+
+@app.get("/api/hygiene")
+async def get_hygiene():
+    items = await engineer.stale_entities(config.STALE_DAYS, (await _local_now()).astimezone(ZoneInfo("UTC")))
+    return {"count": len(items), "items": items[:200]}
+
+
+@app.get("/api/memory")
+async def get_memory(request: Request):
+    if not _trusted(request):
+        raise HTTPException(status_code=403, detail="Accès réservé au panneau Jarvis.")
+    return {"items": autonomy.store.facts(None, 200)}
+
+
+@app.delete("/api/memory/{fid}")
+async def delete_memory(fid: int, request: Request):
+    if not _trusted(request):
+        raise HTTPException(status_code=403, detail="Accès réservé au panneau Jarvis.")
+    if not autonomy.store.delete_fact(fid):
+        raise HTTPException(status_code=404, detail="Fait introuvable.")
+    return {"status": "success"}
 
 
 webui = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webui")
