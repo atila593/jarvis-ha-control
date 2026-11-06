@@ -33,7 +33,7 @@ Jarvis peut agir quand tu le demandes clairement (« allume la salle à manger �
 |---|---|
 | `gemini_api_key` | Clé API Google AI Studio |
 | `gemini_model` | ID du modèle (défaut `gemini-3.6-flash`) |
-| `speak_service` | Service HA, ex. `notify.alexa_media` ou `notify.jarvis` (profil Chime TTS) |
+| `speak_service` | Service HA : `notify.alexa_media`, un profil `notify.*`, ou **`chime_tts.say`** (appel direct, recommandé avec Piper) |
 | `speak_targets` | Cibles, ex. `media_player.echo_show_olivier` |
 | `auto_speak` | Parle automatiquement chaque réponse |
 | `gemini_fallback_model` | Modèle de secours si le principal est saturé |

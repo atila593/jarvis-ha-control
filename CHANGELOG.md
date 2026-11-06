@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.0.1
+- Voix : `speak_service: chime_tts.say` appelle Chime TTS directement (plateforme, langue et voix explicites : `speak_tts_platform`, `speak_language`, `speak_voice`), sans passer par un profil `notify.*`. Corrige le cas « Unsupported options: tld ».
+
 ## 3.0.0
 - Ingénieur HA : propositions de création/modification/suppression d'automations et scripts, validation stricte, vérification, retour arrière automatique, annulation.
 - Nettoyage d'entités fantômes (refus si référencées), `GET /api/hygiene`.

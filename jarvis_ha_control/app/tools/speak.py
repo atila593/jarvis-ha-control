@@ -15,7 +15,16 @@ async def speak(text: str) -> dict:
 
     domain, name = service.split(".", 1)
     payload = {"message": text}
-    if config.SPEAK_TARGETS:
+    if domain == "chime_tts":
+        # Appel direct à Chime TTS : on envoie tout explicitement (plateforme, langue, voix) pour ne dépendre
+        # d'aucun profil `notify.*` ni d'aucune valeur par défaut de l'intégration.
+        payload["tts_platform"] = config.SPEAK_TTS_PLATFORM
+        payload["language"] = config.SPEAK_LANGUAGE
+        if config.SPEAK_VOICE:
+            payload["options"] = {"voice": config.SPEAK_VOICE}
+        if config.SPEAK_TARGETS:
+            payload["entity_id"] = config.SPEAK_TARGETS
+    elif config.SPEAK_TARGETS:
         payload["target"] = config.SPEAK_TARGETS
     if domain == "notify" and name.startswith("alexa_media"):
         payload["data"] = {"type": "announce"}

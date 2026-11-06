@@ -62,3 +62,8 @@ VOICE_ENABLED = bool(OPTIONS.get("voice_enabled", False))
 VOICE_PIN = (OPTIONS.get("voice_pin") or "").strip()
 USER_ROLES = OPTIONS.get("user_roles") or []                 # ex. "Olivier:admin", "Sarah:member"
 HA_WS_URL = os.getenv("HA_WS_URL", "ws://supervisor/core/websocket")
+
+# --- Voix : appel direct à chime_tts.say (speak_service: chime_tts.say) --------
+SPEAK_TTS_PLATFORM = (OPTIONS.get("speak_tts_platform") or "tts.piper").strip()
+SPEAK_LANGUAGE = (OPTIONS.get("speak_language") or "fr_FR").strip()
+SPEAK_VOICE = (OPTIONS.get("speak_voice") or "fr_FR-tom-medium").strip()
