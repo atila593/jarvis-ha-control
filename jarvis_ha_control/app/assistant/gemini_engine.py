@@ -29,9 +29,11 @@ class GeminiUnavailable(Exception):
 class JarvisEngine:
     def __init__(self):
         self.client = genai.Client(api_key=config.GEMINI_API_KEY) if config.GEMINI_API_KEY else None
+        # Clé dédiée à la vision (quota séparé) ; sinon on partage la clé principale.
+        self.vision_client = genai.Client(api_key=config.VISION_API_KEY) if config.VISION_API_KEY else None
 
-    async def _generate(self, model: str, contents, tools=None, system: str | None = None):
-        return await self.client.aio.models.generate_content(
+    async def _generate(self, model: str, contents, tools=None, system: str | None = None, client=None):
+        return await (client or self.client).aio.models.generate_content(
             model=model,
             contents=contents,
             config=types.GenerateContentConfig(
@@ -68,10 +70,12 @@ class JarvisEngine:
 
     async def describe_image(self, image: bytes, prompt: str) -> str:
         """Analyse d'une image de caméra (utilisée par la vision)."""
-        if not self.client:
+        client = self.vision_client or self.client
+        if not client:
             raise GeminiUnavailable("clé API Gemini non configurée")
         part = types.Part.from_bytes(data=image, mime_type="image/jpeg")
-        return await self.ask([part, prompt])
+        # Un seul essai par modèle : réessayer sur un 429 ne ferait qu'aggraver la saturation du quota.
+        return await self.ask([part, prompt], client=client, attempts=1)
 
     async def analyse(self, report_text: str) -> str:
         if not self.client:
@@ -83,16 +87,16 @@ class JarvisEngine:
             "dans Home Assistant (à corriger ou retirer de la liste), pas qu'une intégration est cassée. Pas de markdown."
         )
 
-    async def ask(self, contents, tools=None, system: str | None = None) -> str:
+    async def ask(self, contents, tools=None, system: str | None = None, client=None, attempts: int = ATTEMPTS) -> str:
         models = [config.GEMINI_MODEL]
         if config.GEMINI_FALLBACK_MODEL and config.GEMINI_FALLBACK_MODEL != config.GEMINI_MODEL:
             models.append(config.GEMINI_FALLBACK_MODEL)
 
         last_error = None
         for model in models:
-            for attempt in range(ATTEMPTS):
+            for attempt in range(attempts):
                 try:
-                    response = await asyncio.wait_for(self._generate(model, contents, tools, system), timeout=TIMEOUT)
+                    response = await asyncio.wait_for(self._generate(model, contents, tools, system, client), timeout=TIMEOUT)
                     return (response.text or "").strip() or "Je n'ai pas de réponse."
                 except asyncio.TimeoutError:
                     last_error = "délai dépassé"
@@ -102,7 +106,7 @@ class JarvisEngine:
                     logger.warning("%s: %s (essai %d)", model, last_error, attempt + 1)
                     if e.code not in RETRYABLE:
                         break  # erreur définitive pour ce modèle → modèle suivant
-                if attempt < ATTEMPTS - 1:
+                if attempt < attempts - 1:
                     await asyncio.sleep(1.5 * (attempt + 1))
         raise GeminiUnavailable(f"Gemini indisponible ({last_error}). Réessaie dans un instant.")
 

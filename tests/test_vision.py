@@ -118,3 +118,25 @@ def test_frigate_down_is_logged_once_then_recovers(tmp_path):
 def test_disabled_does_nothing(tmp_path):
     r = Rig(tmp_path, DAY); r.v.s.enabled = False; r.ev(1)
     assert poll(r) == [] and r.calls == []
+
+
+def test_failed_analysis_does_not_consume_budget_and_pauses(tmp_path):
+    r = Rig(tmp_path, DAY, cooldown_min=0)
+    boom = {"on": True}
+
+    async def describe(img, prompt):
+        r.calls.append(prompt)
+        if boom["on"]:
+            raise RuntimeError("429 RESOURCE_EXHAUSTED")
+        return r.verdict
+    r.v.describe = describe
+    r.ev(1, cam="a"); r.ev(2, cam="b")
+    assert poll(r) == []
+    assert r.v.used_today(DAY) == 0                              # échec : pas de budget consommé
+    assert len(r.calls) == 1                                     # et on n'insiste pas sur l'image suivante
+    r.ev(3, cam="c")
+    assert poll(r) == [] and len(r.calls) == 1                   # en pause : plus aucun appel Gemini
+    boom["on"] = False
+    r.now = r.now.replace(hour=14, minute=11)                    # pause de 10 min écoulée
+    out = run(r.v.poll(r.now))
+    assert len(out) >= 1 and r.v.used_today(r.now) == len(out)   # les événements en attente sont enfin traités

@@ -17,6 +17,8 @@ from autonomy.rules import Finding, in_window
 
 logger = logging.getLogger("JarvisVision")
 
+PAUSE_AFTER_FAILURE_MIN = 10   # après un échec Gemini (quota, panne), on laisse souffler avant de réessayer
+
 PROMPT = (
     "Tu analyses l'image d'une caméra de surveillance d'une maison. Caméra : {camera}. Objet détecté : {label}. "
     "Heure locale : {time}. Décris la scène sans jamais chercher à identifier une personne par son visage. "
@@ -71,6 +73,7 @@ class Vision:
         self._last_cam: dict = {}
         self._down = False
         self._budget_logged = None
+        self._pause_until = 0.0
 
     def _budget_key(self, now: datetime) -> str:
         return f"vision_n_{now.date().isoformat()}"
@@ -80,6 +83,8 @@ class Vision:
 
     async def poll(self, now: datetime) -> list:
         if not (self.s.enabled and self.s.frigate_url):
+            return []
+        if now.timestamp() < self._pause_until:
             return []
         base = self.s.frigate_url.rstrip("/")
         after = float(self.store.meta_get("vision_last_ts") or (now.timestamp() - 300))
@@ -125,12 +130,14 @@ class Vision:
                 if not img:
                     continue
                 self._last_cam[cam] = ts
-                self.store.meta_set(self._budget_key(now), str(self.used_today(now) + 1))
                 text = await self.describe(img, PROMPT.format(camera=cam, label=label, time=now.strftime("%H:%M")))
+                self.store.meta_set(self._budget_key(now), str(self.used_today(now) + 1))   # compté seulement si ça a réussi
             except Exception as e:
                 logger.warning("Analyse impossible (%s) : %s", ev.get("id"), e)
-                self.store.log("minor", "vision", f"Analyse impossible pour la caméra {cam} : {e}")
-                continue
+                self.store.log("minor", "vision", f"Analyse impossible pour la caméra {cam} : {e} "
+                                                  f"Pause de {PAUSE_AFTER_FAILURE_MIN} min.")
+                self._pause_until = now.timestamp() + PAUSE_AFTER_FAILURE_MIN * 60
+                break                                                   # inutile d'insister sur les autres images
             verdict = parse_verdict(text)
             findings.append(Finding("vision", f"camera.{cam}", severity_for(verdict, night),
                                     f"Caméra {cam} : {verdict['summary']}"))

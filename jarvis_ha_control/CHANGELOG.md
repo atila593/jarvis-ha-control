@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.2
+- Vision : `vision_api_key` (optionnelle) donne à la vision sa propre clé Gemini, donc son propre quota : elle n'affame plus les réponses de Jarvis.
+- Vision : un seul essai par image (plus de réessais sur un 429, qui aggravaient la saturation) et pause de 10 min après un échec.
+- Vision : une analyse qui échoue ne consomme plus le budget quotidien.
+
 ## 3.0.1
 - Voix : `speak_service: chime_tts.say` appelle Chime TTS directement (plateforme, langue et voix explicites : `speak_tts_platform`, `speak_language`, `speak_voice`), sans passer par un profil `notify.*`. Corrige le cas « Unsupported options: tld ».
 
