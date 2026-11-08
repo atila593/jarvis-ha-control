@@ -32,7 +32,7 @@ from tools.sys_diagnose import SystemDiagnose  # noqa: E402
 logging.basicConfig(level=config.LOG_LEVEL)
 logger = logging.getLogger("JarvisCore")
 
-VERSION = "3.0.2"
+VERSION = "3.0.3"
 INGRESS_IP = "172.30.32.2"  # seul le proxy Ingress du Supervisor peut valider une proposition
 jarvis = JarvisEngine()
 diagnose = SystemDiagnose()

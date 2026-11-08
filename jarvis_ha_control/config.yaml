@@ -1,5 +1,5 @@
 name: Jarvis HA Control
-version: "3.0.2"
+version: "3.0.3"
 slug: jarvis_ha_control
 description: Assistant Gemini, HUD web et diagnostic système pour Home Assistant, avec réponse vocale Alexa optionnelle.
 url: https://github.com/atila593/jarvis-ha-control
@@ -55,6 +55,7 @@ options:
     - person
   vision_cameras: []
   vision_api_key: ""
+  vision_model: ""
   vision_daily_budget: 60
   vision_cooldown_minutes: 5
   memory_enabled: false
@@ -110,6 +111,7 @@ schema:
   vision_cameras:
     - str
   vision_api_key: password?
+  vision_model: str?
   vision_daily_budget: int(1,1000)
   vision_cooldown_minutes: int(0,120)
   memory_enabled: bool

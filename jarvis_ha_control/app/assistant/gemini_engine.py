@@ -23,7 +23,29 @@ TIMEOUT = 40
 
 
 class GeminiUnavailable(Exception):
-    pass
+    """Gemini injoignable ou quota épuisé. `retry_after` (s), `quota` et `detail` viennent de la réponse de Google si présents."""
+
+    def __init__(self, message: str, retry_after: int | None = None, quota: str | None = None, detail: str = ""):
+        super().__init__(message)
+        self.retry_after, self.quota, self.detail = retry_after, quota, detail
+
+
+def quota_info(exc) -> tuple[int | None, str | None, str]:
+    """(secondes avant réessai, identifiant du quota dépassé, message de Google) tirés d'une erreur APIError."""
+    body = getattr(exc, "details", None)
+    err = (body.get("error", body) if isinstance(body, dict) else None) or {}
+    retry, quota = None, None
+    for d in err.get("details") or []:
+        kind = str(d.get("@type", ""))
+        if kind.endswith("RetryInfo"):
+            try:
+                retry = int(float(str(d.get("retryDelay", "")).rstrip("s")))
+            except ValueError:
+                pass
+        elif kind.endswith("QuotaFailure"):
+            v = (d.get("violations") or [{}])[0]
+            quota = v.get("quotaId") or v.get("quotaMetric")
+    return retry, quota, str(err.get("message", ""))[:240]
 
 
 class JarvisEngine:
@@ -75,7 +97,8 @@ class JarvisEngine:
             raise GeminiUnavailable("clé API Gemini non configurée")
         part = types.Part.from_bytes(data=image, mime_type="image/jpeg")
         # Un seul essai par modèle : réessayer sur un 429 ne ferait qu'aggraver la saturation du quota.
-        return await self.ask([part, prompt], client=client, attempts=1)
+        models = [config.VISION_MODEL] if config.VISION_MODEL else None
+        return await self.ask([part, prompt], client=client, attempts=1, models=models)
 
     async def analyse(self, report_text: str) -> str:
         if not self.client:
@@ -87,12 +110,14 @@ class JarvisEngine:
             "dans Home Assistant (à corriger ou retirer de la liste), pas qu'une intégration est cassée. Pas de markdown."
         )
 
-    async def ask(self, contents, tools=None, system: str | None = None, client=None, attempts: int = ATTEMPTS) -> str:
-        models = [config.GEMINI_MODEL]
-        if config.GEMINI_FALLBACK_MODEL and config.GEMINI_FALLBACK_MODEL != config.GEMINI_MODEL:
-            models.append(config.GEMINI_FALLBACK_MODEL)
+    async def ask(self, contents, tools=None, system: str | None = None, client=None, attempts: int = ATTEMPTS,
+                  models: list | None = None) -> str:
+        if not models:
+            models = [config.GEMINI_MODEL]
+            if config.GEMINI_FALLBACK_MODEL and config.GEMINI_FALLBACK_MODEL != config.GEMINI_MODEL:
+                models.append(config.GEMINI_FALLBACK_MODEL)
 
-        last_error = None
+        last_error, retry_after, quota, detail = None, None, None, ""
         for model in models:
             for attempt in range(attempts):
                 try:
@@ -103,12 +128,15 @@ class JarvisEngine:
                     logger.warning("%s: délai dépassé (essai %d)", model, attempt + 1)
                 except errors.APIError as e:
                     last_error = f"{e.code} {e.status}"
-                    logger.warning("%s: %s (essai %d)", model, last_error, attempt + 1)
+                    retry_after, quota, detail = quota_info(e)
+                    logger.warning("%s: %s (essai %d) quota=%s retry=%ss — %s", model, last_error, attempt + 1,
+                                   quota, retry_after, detail)
                     if e.code not in RETRYABLE:
                         break  # erreur définitive pour ce modèle → modèle suivant
                 if attempt < attempts - 1:
                     await asyncio.sleep(1.5 * (attempt + 1))
-        raise GeminiUnavailable(f"Gemini indisponible ({last_error}). Réessaie dans un instant.")
+        raise GeminiUnavailable(f"Gemini indisponible ({last_error}). Réessaie dans un instant.",
+                                retry_after=retry_after, quota=quota, detail=detail)
 
     async def _fetch_ha_states(self):
         """Contexte envoyé à Gemini : (texte, ensemble des entités pilotables connues)."""

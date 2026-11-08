@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.3
+- Gemini : les erreurs 429 journalisent maintenant le détail donné par Google (quota dépassé, délai conseillé).
+- Vision : la pause après un échec suit ce que dit Google (délai conseillé ; 60 min si le quota JOURNALIER est épuisé) ; le journal indique la cause.
+- Vision : option `vision_model` pour utiliser un modèle plus léger (quota souvent plus large) sans changer celui de Jarvis.
+
 ## 3.0.2
 - Vision : `vision_api_key` (optionnelle) donne à la vision sa propre clé Gemini, donc son propre quota : elle n'affame plus les réponses de Jarvis.
 - Vision : un seul essai par image (plus de réessais sur un 429, qui aggravaient la saturation) et pause de 10 min après un échec.

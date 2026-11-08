@@ -17,7 +17,20 @@ from autonomy.rules import Finding, in_window
 
 logger = logging.getLogger("JarvisVision")
 
-PAUSE_AFTER_FAILURE_MIN = 10   # après un échec Gemini (quota, panne), on laisse souffler avant de réessayer
+PAUSE_DEFAULT_S = 600          # échec Gemini sans indication de Google : on laisse souffler 10 min
+PAUSE_DAILY_S = 3600           # quota « par jour » épuisé : inutile de réessayer avant longtemps
+PAUSE_MIN_S, PAUSE_MAX_S = 30, 3600
+
+
+def pause_for(exc) -> tuple[int, str]:
+    """Durée de pause (s) et libellé, d'après la réponse de Google (délai conseillé, type de quota)."""
+    quota = str(getattr(exc, "quota", "") or "")
+    retry = getattr(exc, "retry_after", None)
+    if "perday" in quota.lower().replace("_", "").replace("-", ""):
+        return PAUSE_DAILY_S, "quota JOURNALIER épuisé"
+    if retry:
+        return max(PAUSE_MIN_S, min(int(retry) + 5, PAUSE_MAX_S)), "quota par minute" if "minute" in quota.lower() else "limite temporaire"
+    return PAUSE_DEFAULT_S, "cause inconnue"
 
 PROMPT = (
     "Tu analyses l'image d'une caméra de surveillance d'une maison. Caméra : {camera}. Objet détecté : {label}. "
@@ -134,9 +147,12 @@ class Vision:
                 self.store.meta_set(self._budget_key(now), str(self.used_today(now) + 1))   # compté seulement si ça a réussi
             except Exception as e:
                 logger.warning("Analyse impossible (%s) : %s", ev.get("id"), e)
+                secs, kind = pause_for(e)
+                detail = getattr(e, "detail", "")
                 self.store.log("minor", "vision", f"Analyse impossible pour la caméra {cam} : {e} "
-                                                  f"Pause de {PAUSE_AFTER_FAILURE_MIN} min.")
-                self._pause_until = now.timestamp() + PAUSE_AFTER_FAILURE_MIN * 60
+                                                  f"[{kind}{' · ' + e.quota if getattr(e, 'quota', None) else ''}] "
+                                                  f"{detail} Pause de {max(1, round(secs / 60))} min.".replace("  ", " "))
+                self._pause_until = now.timestamp() + secs
                 break                                                   # inutile d'insister sur les autres images
             verdict = parse_verdict(text)
             findings.append(Finding("vision", f"camera.{cam}", severity_for(verdict, night),

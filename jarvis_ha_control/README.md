@@ -85,7 +85,7 @@ Chaque fonction a son interrupteur : active-les une par une.
 |---|---|
 | `engineer_enabled` | Jarvis peut **proposer** de créer/modifier/supprimer des automations et scripts, et de retirer des entités fantômes |
 | `engineer_edit_existing` | autorise aussi à modifier/supprimer **tes** automations (sinon uniquement celles que Jarvis a créées) |
-| `vision_enabled` + `frigate_url` | analyse des événements Frigate par Gemini (ex. `http://192.168.1.2:5000`). `vision_api_key` : clé Gemini dédiée (quota séparé), vide = clé principale. `vision_cameras` : limite aux caméras Frigate listées |
+| `vision_enabled` + `frigate_url` | analyse des événements Frigate par Gemini (ex. `http://192.168.1.2:5000`). `vision_api_key` : clé Gemini dédiée (quota séparé), vide = clé principale. `vision_model` : modèle dédié (ex. un modèle « lite »), vide = modèle principal. `vision_cameras` : limite aux caméras Frigate listées |
 | `memory_enabled` | retient des préférences par personne |
 | `voice_enabled` + `voice_pin` | validation vocale (« jarvis oui 1234 ») |
 | `user_roles` | `["Olivier:admin", "Sarah:member"]` |

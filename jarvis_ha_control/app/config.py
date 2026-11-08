@@ -52,6 +52,7 @@ ENGINEER_ENABLED = bool(OPTIONS.get("engineer_enabled", False))
 ENGINEER_EDIT_EXISTING = bool(OPTIONS.get("engineer_edit_existing", False))
 STALE_DAYS = int(OPTIONS.get("stale_days") or 7)
 VISION_ENABLED = bool(OPTIONS.get("vision_enabled", False))
+VISION_MODEL = (OPTIONS.get("vision_model") or "").strip()       # vide = gemini_model puis gemini_fallback_model
 VISION_API_KEY = (OPTIONS.get("vision_api_key") or "").strip()   # vide = même clé que Jarvis
 FRIGATE_URL = (OPTIONS.get("frigate_url") or "").strip()
 VISION_LABELS = OPTIONS.get("vision_labels") or ["person"]
