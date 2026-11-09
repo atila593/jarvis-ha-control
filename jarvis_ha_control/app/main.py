@@ -20,6 +20,7 @@ from autonomy import rules as arules  # noqa: E402
 from autonomy.engine import AutonomyEngine, Settings  # noqa: E402
 from autonomy.engineer import Engineer  # noqa: E402
 from autonomy.ha import HaClient  # noqa: E402
+from autonomy.ha_websocket import HAWebSocketClient, init_websocket, close_websocket  # noqa: E402
 from autonomy.store import Store  # noqa: E402
 from autonomy.vision import Vision, VisionSettings  # noqa: E402
 from tools.toolbox import Toolbox  # noqa: E402
@@ -39,8 +40,12 @@ diagnose = SystemDiagnose()
 autonomy: AutonomyEngine | None = None
 engineer: Engineer | None = None
 gate: access.VoiceGate | None = None
+websocket_client: HAWebSocketClient | None = None  # NOUVEAU : Client WebSocket HA
 ROLES: dict = {}
 _TZ = {"name": None}
+
+# NOUVEAU : Configuration WebSocket
+HA_WEBSOCKET_ENABLED = os.getenv("HA_WEBSOCKET_ENABLED", "true").lower() == "true"
 
 
 async def _local_now() -> datetime:
@@ -78,7 +83,30 @@ async def _spoken_report() -> str:
     return st.spoken_summary(await _make_report(True))
 
 
-def build_autonomy() -> AutonomyEngine:
+# NOUVEAU : Gestionnaire d'événements WebSocket
+async def _handle_ha_event(event: dict) -> None:
+    """Gère un événement reçu via WebSocket de Home Assistant."""
+    event_type = event.get("event_type")
+    data = event.get("data", {})
+    
+    logger.debug("Événement HA reçu: %s - %s", event_type, data.get("entity_id", "N/A"))
+    
+    # Pour l'instant, on déclenche une vérification de l'autonomie
+    # (À améliorer : traitement direct des événements)
+    if autonomy and event_type == "state_changed":
+        # Extraire l'entité modifiée
+        entity_id = data.get("entity_id")
+        new_state = data.get("new_state")
+        old_state = data.get("old_state")
+        
+        if entity_id and new_state:
+            logger.info("Changement détecté: %s -> %s", entity_id, new_state.get("state"))
+            # Déclencher une évaluation des règles pour cette entité
+            # (Le moteur d'autonomie sera modifié pour gérer ça)
+            pass
+
+
+def build_autonomy(websocket_enabled: bool = False) -> AutonomyEngine:
     params = arules.Params(
         quiet_start=arules.parse_time(config.QUIET_START, arules.time(23, 0)),
         quiet_end=arules.parse_time(config.QUIET_END, arules.time(7, 0)),
@@ -87,9 +115,16 @@ def build_autonomy() -> AutonomyEngine:
         hidden=list(config.HIDDEN_ENTITIES),
         enabled=list(config.AUTONOMY_RULES),
     )
+    
+    # NOUVEAU : Intervalle réduit si WebSocket actif
+    effective_interval = config.AUTONOMY_INTERVAL if not websocket_enabled else max(5, config.AUTONOMY_INTERVAL // 3)
+    
     settings = Settings(
-        enabled=config.AUTONOMY_ENABLED, interval=config.AUTONOMY_INTERVAL, auto_rules=list(config.AUTO_RULES),
-        approvers=list(config.APPROVERS), proposal_ttl_min=config.PROPOSAL_TTL_MIN,
+        enabled=config.AUTONOMY_ENABLED, 
+        interval=effective_interval, 
+        auto_rules=list(config.AUTO_RULES),
+        approvers=list(config.APPROVERS), 
+        proposal_ttl_min=config.PROPOSAL_TTL_MIN,
         daily_report_time=config.DAILY_REPORT_TIME,
     )
     store = Store()
@@ -133,13 +168,37 @@ def build_autonomy() -> AutonomyEngine:
 
 @asynccontextmanager
 async def lifespan(_app):
-    global autonomy
-    autonomy = build_autonomy()
+    global autonomy, websocket_client
+    
+    # NOUVEAU : Initialiser le WebSocket si activé
+    if HA_WEBSOCKET_ENABLED and config.AUTONOMY_ENABLED:
+        try:
+            websocket_client = await init_websocket(
+                on_event=_handle_ha_event,
+                event_types=["state_changed", "call_service"]
+            )
+            logger.info("✅ WebSocket HA connecté - écoute des événements en temps réel")
+        except Exception as e:
+            logger.error("❌ Échec de la connexion WebSocket: %s - bascule en mode polling", e)
+            websocket_client = None
+    
+    # Construire l'autonomie avec ou sans WebSocket
+    autonomy = build_autonomy(websocket_enabled=websocket_client is not None)
+    
+    # Démarrer le moteur d'autonomie
     task = asyncio.create_task(autonomy.run()) if config.AUTONOMY_ENABLED else None
-    logger.info("Jarvis %s démarré — autonomie %s", VERSION, "ACTIVE" if task else "désactivée")
+    logger.info("Jarvis %s démarré — autonomie %s — WebSocket %s", 
+                VERSION, 
+                "ACTIVE" if task else "désactivée",
+                "ACTIF" if websocket_client else "INACTIF (polling)")
+    
     yield
+    
+    # Nettoyage
     if task:
         task.cancel()
+    if websocket_client:
+        await close_websocket()
 
 
 app = FastAPI(title="Jarvis HA Control", version=VERSION, lifespan=lifespan)
