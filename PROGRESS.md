@@ -11,7 +11,7 @@
 ## 📈 **Progression Globale**
 
 ![Progress](https://progress-bar.dev/10/?scale=10&title=Progress&width=500&color=22c55e)
-**✅ 10% terminé** (1/10 jours)
+**✅ 20% terminé** (2/10 jours)
 
 ---
 
@@ -20,7 +20,7 @@
 | Jour | Date | Objectif | Statut | PR | Commits |
 |------|------|----------|--------|----|---------|
 | **1** | 11/11 | ⚡ Webhooks HA pour réactivité temps réel | ✅ **TERMINÉ** | ⏳ [À créer](#) | [23044f5](https://github.com/atila593/jarvis-ha-control/commit/23044f5) |
-| 2 | 12/11 | ⚡ Polling optimisé + Parallélisation | ⏳ À faire | - | - |
+| 2 | 12/11 | ⚡ Polling optimisé + Parallélisation | ✅ TERMINÉ | [#2](https://github.com/atila593/jarvis-ha-control/pull/2) | f10f570|
 | 3 | 13/11 | 🤖 Système de confiance | ⏳ À faire | - | - |
 | 4 | 14/11 | 🤖 Règles dynamiques | ⏳ À faire | - | - |
 | 5 | 15/11 | 🧠 Agent Conversation | ⏳ À faire | - | - |
@@ -47,6 +47,8 @@
 
 **📦 Total J1** : 4 fichiers, +1050 lignes, -6 lignes
 
+**📊 Total J2** : 2 fichiers, +492 lignes, -5 lignes
+
 ---
 
 ## 🔄 **Tâches en Cours**
@@ -55,7 +57,7 @@ Aucune tâche en cours actuellement.
 
 ---
 
-## 📋 **Prochaines Étapes (JOUR 2 - 12/11)**
+## 📋 **Prochaines Étapes (JOUR 3 - 13/11)**
 
 ### **⚡ Polling Optimisé + Parallélisation**
 
@@ -77,14 +79,14 @@ Aucune tâche en cours actuellement.
 
 | Métrique | Valeur | Objectif |
 |----------|--------|----------|
-| **Lignes de code ajoutées** | +1,050 | +2,000 |
-| **Lignes de code supprimées** | -6 | -500 |
-| **Fichiers modifiés** | 3 | 20 |
-| **Fichiers créés** | 1 | 10 |
+| **+2048
+| **-11
+| **7
+| **6
 | **Tests passés** | 0/8 (à exécuter) | 54+ |
 | **PR créées** | 0 (1 en préparation) | 5 |
-| **Temps passé** | ~6h | 7-10 jours |
-| **Temps restant estimé** | ~24h | - |
+| **~12h
+| **~18h
 
 ---
 
@@ -314,3 +316,38 @@ Le **Jour 1 est terminé avec succès** ! 🎉
 ---
 
 *Dernière mise à jour : 11 Novembre 2026 - 15h30*
+
+---
+
+## 📅 **Journal de Bord - JOUR 2 (12 Novembre 2026)**
+
+**9h00 - 10h00** :
+- ✅ Polling adaptatif implémenté
+  - Intervalle dynamique basé sur l'activité
+  - 5s pour alertes urgentes, 10s pour propositions, 15s pour activité récente
+
+**10h00 - 11h00** :
+- ✅ Polling ciblé implémenté
+  - Récupération uniquement des entités surveillées
+  - Réduction de la charge serveur
+
+**11h00 - 13h00** :
+- ✅ Traitement parallèle des règles
+  - Utilisation d'asyncio.gather
+  - Traitement par batches de 10 entités
+
+**13h00 - 14h00** : **PAUSE**
+
+**14h00 - 15h00** :
+- ✅ Tests unitaires pour le polling optimisé
+  - Tests adaptatifs, ciblés, parallèles
+
+**15h00 - 16h00** :
+- ✅ Fusion dans vibe/autonomy-boost
+- ✅ Création PR #2
+
+**16h00 - 16h30** :
+- ✅ Mise à jour PROGRESS.md
+
+**16h30** : **RÉSUMÉ ENVYÉ**
+
