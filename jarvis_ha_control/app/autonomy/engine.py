@@ -6,11 +6,17 @@ Politique :
   minor     -> note dans le journal (repris dans le rapport du matin)
 
 Jamais d'action sans validation, sauf règle explicitement listée dans `auto_rules`.
+
+NOUVEAU : Polling optimisé
+- Polling adaptatif : intervalle dynamique basé sur l'activité
+- Polling ciblé : uniquement les entités surveillées
+- Traitement parallèle des règles
 """
 import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from typing import Optional, Set
 
 from autonomy import rules
 from autonomy.store import Store
@@ -19,6 +25,15 @@ logger = logging.getLogger("JarvisAutonomy")
 
 URGENT_REPEAT_MIN = 10
 URGENT_MAX_REMINDERS = 3
+
+# NOUVEAU : Configuration du polling optimisé
+MIN_POLLING_INTERVAL = 5  # Secondes (minimum pour éviter la surcharge)
+MAX_POLLING_INTERVAL = 60  # Secondes (maximum)
+DEFAULT_POLLING_INTERVAL = 30  # Secondes
+
+# NOUVEAU : Seuil pour le polling adaptatif
+ACTIVE_ALERTS_THRESHOLD = 1  # Si des alertes urgentes, polling rapide
+PENDING_PROPOSALS_THRESHOLD = 1  # Si des propositions en attente, polling moyen
 
 
 @dataclass
@@ -29,17 +44,22 @@ class Settings:
     approvers: list = field(default_factory=list)
     proposal_ttl_min: int = 120
     daily_report_time: str = ""
+    adaptive_polling: bool = True
+    targeted_polling: bool = True
+    parallel_processing: bool = True
 
 
 class AutonomyEngine:
     """Les dépendances (réseau, voix, notifications) sont injectées : le moteur se teste sans HA."""
 
     def __init__(self, store: Store, settings: Settings, params: rules.Params, *,
-                 fetch_states, execute, speak, notify, report, local_now, handlers=None, vision=None):
+                 fetch_states, execute, speak, notify, report, local_now, handlers=None, vision=None,
+                 fetch_targeted_states=None):
         self.store = store
         self.s = settings
         self.params = params
-        self.fetch_states = fetch_states   # async () -> list[dict]
+        self.fetch_states = fetch_states   # async () -> list[dict] (toutes les entités)
+        self.fetch_targeted_states = fetch_targeted_states or fetch_states  # async (entities) -> list[dict]
         self.execute = execute             # async (domain, service, entity_id) -> str ("OK ..." si réussi)
         self.speak = speak                 # async (text) -> None
         self.notify = notify               # async (title, message) -> None
@@ -53,6 +73,10 @@ class AutonomyEngine:
             k: {"severity": v["severity"], "first": v["first_seen"], "last": v["last_notified"], "n": v["notified_count"]}
             for k, v in store.active_load().items()
         }
+        # NOUVEAU : Tracking pour le polling optimisé
+        self._urgent_alerts_count: int = 0
+        self._pending_proposals_count: int = 0
+        self._last_activity_time: Optional[datetime] = None
 
     # ------------------------------------------------------------------ boucle
     async def run(self):
@@ -62,14 +86,36 @@ class AutonomyEngine:
                 await self.tick()
             except Exception:
                 logger.exception("Erreur dans la boucle d'autonomie")
-            await asyncio.sleep(max(10, self.s.interval))
+            # NOUVEAU : Intervalle adaptatif
+            interval = self._calculate_adaptive_interval()
+            logger.debug("Prochain tick dans %s secondes (intervalle adaptatif)", interval)
+            await asyncio.sleep(max(5, interval))  # Minimum 5 secondes pour éviter la surcharge
 
     async def tick(self):
         now = await self.local_now()
-        states = await self.fetch_states()
+        
+        # NOUVEAU : Polling ciblé si activé
+        if self.s.targeted_polling and self._has_watched_entities():
+            watched_entities = self._get_watched_entities()
+            states = await self._fetch_targeted_states(watched_entities)
+            logger.debug("Polling ciblé : %d entités surveillées", len(watched_entities))
+        else:
+            states = await self.fetch_states()
+            logger.debug("Polling complet : toutes les entités")
+        
         self.states_by_id = {s.get("entity_id"): s for s in states}
-        findings = rules.evaluate(states, now, self.params)
+        
+        # NOUVEAU : Traitement parallèle des règles si activé
+        if self.s.parallel_processing:
+            findings = await self._evaluate_rules_parallel(states, now)
+        else:
+            findings = rules.evaluate(states, now, self.params)
+        
         await self._process(findings, now)
+        
+        # NOUVEAU: Mettre à jour les compteurs d'activité
+        self._update_activity_counters()
+        
         if self.vision:
             try:
                 for f in await self.vision.poll(now):
@@ -79,6 +125,67 @@ class AutonomyEngine:
         self._expire(now)
         await self._daily_report(now)
         self.last_tick = now.isoformat(timespec="seconds")
+        self._last_activity_time = now
+
+    # ----------------------------------------- NOUVEAU : Polling Optimisé
+    def _calculate_adaptive_interval(self) -> int:
+        """Calcule l'intervalle de polling en fonction de l'activité."""
+        if self._urgent_alerts_count > 0:
+            return 5
+        if self._pending_proposals_count > 0:
+            return 10
+        if self._last_activity_time:
+            time_since_activity = (datetime.now(timezone.utc) - self._last_activity_time.replace(tzinfo=timezone.utc)).total_seconds()
+            if time_since_activity < 30:
+                return 15
+        return self.s.interval
+
+    def _has_watched_entities(self) -> bool:
+        """Vérifie s'il y a des entités à surveiller."""
+        return bool(self.params.watched or self.params.hidden)
+
+    def _get_watched_entities(self) -> Set[str]:
+        """Récupère la liste des entités à surveiller."""
+        watched = set(self.params.watched or [])
+        for key in self.active:
+            entity_id = key.split(":", 1)[-1]
+            watched.add(entity_id)
+        return watched
+
+    async def _fetch_targeted_states(self, entities: Set[str]) -> list:
+        """Récupère uniquement les états des entités spécifiées."""
+        if self.fetch_targeted_states != self.fetch_states:
+            try:
+                return await self.fetch_targeted_states(entities)
+            except Exception as e:
+                logger.warning("Polling ciblé échoué: %s", e)
+        all_states = await self.fetch_states()
+        return [s for s in all_states if s.get("entity_id") in entities]
+
+    async def _evaluate_rules_parallel(self, states: list, now: datetime) -> list:
+        """Évalue les règles en parallèle."""
+        BATCH_SIZE = 10
+        batches = [states[i:i + BATCH_SIZE] for i in range(0, len(states), BATCH_SIZE)]
+        tasks = [self._evaluate_batch(batch, now, self.params) for batch in batches]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        findings = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.warning("Erreur évaluation parallèle: %s", result)
+            elif isinstance(result, list):
+                findings.extend(result)
+        return findings
+
+    async def _evaluate_batch(self, states: list, now: datetime, params: rules.Params) -> list:
+        """Évalue un batch d'états."""
+        return rules.evaluate(states, now, params)
+
+    def _update_activity_counters(self) -> None:
+        """Met à jour les compteurs d'activité."""
+        self._urgent_alerts_count = sum(
+            1 for v in self.active.values() if v.get("severity") == "urgent"
+        )
+        self._pending_proposals_count = len(self.store.proposals("pending"))
 
     # ------------------------------------------------------------ traitement
     def is_quiet(self, now: datetime) -> bool:
