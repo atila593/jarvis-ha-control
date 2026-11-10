@@ -1,7 +1,7 @@
 name: Jarvis HA Control
 version: "3.3.1"
 slug: jarvis_ha_control
-description: Assistant Gemini, HUD web et diagnostic systeme pour Home Assistant, avec reponse vocale Alexa optionnelle. Version 3.3.1 : Correction bug pickle + Systeme de confiance + Regles dynamiques.
+description: "Assistant Gemini, HUD web et diagnostic systeme pour Home Assistant, avec reponse vocale Alexa optionnelle. Version 3.3.1 : Correction bug pickle + Systeme de confiance + Regles dynamiques."
 url: https://github.com/atila593/jarvis-ha-control
 arch:
   - amd64
