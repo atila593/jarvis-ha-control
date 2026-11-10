@@ -1,3 +1,6 @@
+## 3.3.1
+- **FIX: Correction bug pickle** : Remplacement des threading.Lock() par des transactions SQLite + implémentation de __getstate__/__setstate__ pour permettre la sérialisation de l'objet Store
+
 ## 3.3.0
 - **Système de confiance** : Score de confiance dynamique (0.0-1.0) pour les actions autonomes
 - **Règles dynamiques** : Actions basées sur la présence, l'heure, la météo et l'état du système
