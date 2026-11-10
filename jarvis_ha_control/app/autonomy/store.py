@@ -1,8 +1,11 @@
-"""Stockage SQLite : journal des décisions, propositions à valider, alertes en cours."""
+"""Stockage SQLite : journal des d\u00e9cisions, propositions \u00e0 valider, alertes en cours.
+
+FIX: Suppression des threading.Lock() non-picklables.
+SQLite est thread-safe avec check_same_thread=False, donc pas besoin de locks Python.
+"""
 import json
 import os
 import sqlite3
-import threading
 from datetime import datetime, timezone
 
 DB_PATH = os.getenv("JARVIS_DB", "/data/jarvis.db")
@@ -68,16 +71,31 @@ def _now() -> str:
 class Store:
     def __init__(self, path: str | None = None):
         self.path = path or os.getenv("JARVIS_DB") or DB_PATH
-        self._lock = threading.Lock()
+        # FIX: Suppression du threading.Lock() non-picklable
+        # SQLite est thread-safe avec check_same_thread=False
         self._db = sqlite3.connect(self.path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
-        with self._lock:
+        # Utilisation de transactions explicites au lieu de locks Python
+        with self._db:
             self._db.executescript(SCHEMA)
             self._db.commit()
 
+    def __getstate__(self) -> dict:
+        # Fermer la connexion avant pickling
+        self._db.close()
+        state = self.__dict__.copy()
+        del state["_db"]
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        # Recréer la connexion après unpickling
+        self.__dict__.update(state)
+        self._db = sqlite3.connect(self.path, check_same_thread=False)
+        self._db.row_factory = sqlite3.Row
+
     # --- journal -----------------------------------------------------------
     def log(self, severity: str, kind: str, message: str, entity_id: str | None = None) -> int:
-        with self._lock:
+        with self._db:
             cur = self._db.execute(
                 "INSERT INTO journal (ts, severity, kind, entity_id, message) VALUES (?,?,?,?,?)",
                 (_now(), severity, kind, entity_id, message),
@@ -92,13 +110,13 @@ class Store:
             args.append(since)
         q += " ORDER BY id DESC LIMIT ?"
         args.append(int(limit))
-        with self._lock:
+        with self._db:
             return [dict(r) for r in self._db.execute(q, args).fetchall()]
 
     # --- propositions ------------------------------------------------------
     def add_proposal(self, rule: str, entity_id: str, message: str, action: dict, expect_state: str | None) -> int:
         now = _now()
-        with self._lock:
+        with self._db:
             cur = self._db.execute(
                 "INSERT INTO proposals (created, updated, status, rule, entity_id, message, action, expect_state) "
                 "VALUES (?,?,?,?,?,?,?,?)",
@@ -108,7 +126,7 @@ class Store:
             return cur.lastrowid
 
     def get_proposal(self, pid: int) -> dict | None:
-        with self._lock:
+        with self._db:
             row = self._db.execute("SELECT * FROM proposals WHERE id=?", (pid,)).fetchone()
         return self._proposal(row) if row else None
 
@@ -119,19 +137,19 @@ class Store:
             args.append(status)
         q += " ORDER BY id DESC LIMIT ?"
         args.append(int(limit))
-        with self._lock:
+        with self._db:
             rows = self._db.execute(q, args).fetchall()
         return [self._proposal(r) for r in rows]
 
     def pending_for(self, rule: str, entity_id: str) -> dict | None:
-        with self._lock:
+        with self._db:
             row = self._db.execute(
                 "SELECT * FROM proposals WHERE status='pending' AND rule=? AND entity_id=?", (rule, entity_id)
             ).fetchone()
         return self._proposal(row) if row else None
 
     def set_proposal(self, pid: int, status: str, decided_by: str | None = None, result: str | None = None) -> None:
-        with self._lock:
+        with self._db:
             self._db.execute(
                 "UPDATE proposals SET status=?, updated=?, decided_by=COALESCE(?, decided_by), result=COALESCE(?, result) "
                 "WHERE id=?",
@@ -140,7 +158,7 @@ class Store:
             self._db.commit()
 
     def expire_proposals(self, older_than_iso: str) -> int:
-        with self._lock:
+        with self._db:
             cur = self._db.execute(
                 "UPDATE proposals SET status='expired', updated=? WHERE status='pending' AND created < ?",
                 (_now(), older_than_iso),
@@ -154,14 +172,14 @@ class Store:
         d["action"] = json.loads(d["action"])
         return d
 
-    # --- alertes en cours (survivent à un redémarrage) ---------------------
+    # --- alertes en cours (survivent \u00e0 un red\u00e9marrage) ---------------------
     def active_load(self) -> dict:
-        with self._lock:
+        with self._db:
             rows = self._db.execute("SELECT * FROM active").fetchall()
         return {r["key"]: dict(r) for r in rows}
 
     def active_save(self, key: str, severity: str, first_seen: str, last_notified: str, count: int) -> None:
-        with self._lock:
+        with self._db:
             self._db.execute(
                 "INSERT INTO active (key, severity, first_seen, last_notified, notified_count) VALUES (?,?,?,?,?) "
                 "ON CONFLICT(key) DO UPDATE SET severity=excluded.severity, last_notified=excluded.last_notified, "
@@ -171,24 +189,24 @@ class Store:
             self._db.commit()
 
     def active_delete(self, key: str) -> None:
-        with self._lock:
+        with self._db:
             self._db.execute("DELETE FROM active WHERE key=?", (key,))
             self._db.commit()
 
     # --- meta --------------------------------------------------------------
     def meta_get(self, k: str) -> str | None:
-        with self._lock:
+        with self._db:
             row = self._db.execute("SELECT v FROM meta WHERE k=?", (k,)).fetchone()
         return row["v"] if row else None
 
     def meta_set(self, k: str, v: str) -> None:
-        with self._lock:
+        with self._db:
             self._db.execute("INSERT INTO meta (k, v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (k, v))
             self._db.commit()
 
     # --- modifications de configuration (annulables) -----------------------
     def add_change(self, kind: str, object_id: str, op: str, before, after, proposal_id: int | None = None) -> int:
-        with self._lock:
+        with self._db:
             cur = self._db.execute(
                 "INSERT INTO changes (ts, kind, object_id, op, before, after, status, proposal_id) VALUES (?,?,?,?,?,?,?,?)",
                 (_now(), kind, object_id, op, json.dumps(before), json.dumps(after), "applying", proposal_id),
@@ -197,22 +215,22 @@ class Store:
             return cur.lastrowid
 
     def set_change(self, cid: int, status: str, note: str | None = None) -> None:
-        with self._lock:
+        with self._db:
             self._db.execute("UPDATE changes SET status=?, note=COALESCE(?, note) WHERE id=?", (status, note, cid))
             self._db.commit()
 
     def get_change(self, cid: int) -> dict | None:
-        with self._lock:
+        with self._db:
             row = self._db.execute("SELECT * FROM changes WHERE id=?", (cid,)).fetchone()
         return self._change(row) if row else None
 
     def changes(self, limit: int = 30) -> list[dict]:
-        with self._lock:
+        with self._db:
             rows = self._db.execute("SELECT * FROM changes ORDER BY id DESC LIMIT ?", (int(limit),)).fetchall()
         return [self._change(r) for r in rows]
 
     def last_applied_change(self) -> dict | None:
-        with self._lock:
+        with self._db:
             row = self._db.execute("SELECT * FROM changes WHERE status='applied' ORDER BY id DESC LIMIT 1").fetchone()
         return self._change(row) if row else None
 
@@ -223,9 +241,9 @@ class Store:
         d["after"] = json.loads(d["after"]) if d["after"] else None
         return d
 
-    # --- mémoire (faits retenus par personne) ------------------------------
+    # --- m\u00e9moire (faits retenus par personne) ------------------------------
     def add_fact(self, person: str, fact: str) -> int:
-        with self._lock:
+        with self._db:
             dup = self._db.execute("SELECT id FROM facts WHERE person=? AND lower(fact)=lower(?)", (person, fact)).fetchone()
             if dup:
                 return dup["id"]
@@ -240,11 +258,11 @@ class Store:
             args.append(person)
         q += " ORDER BY id DESC LIMIT ?"
         args.append(int(limit))
-        with self._lock:
+        with self._db:
             return [dict(r) for r in self._db.execute(q, args).fetchall()]
 
     def delete_fact(self, fid: int) -> bool:
-        with self._lock:
+        with self._db:
             cur = self._db.execute("DELETE FROM facts WHERE id=?", (fid,))
             self._db.commit()
             return cur.rowcount > 0
