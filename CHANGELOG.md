@@ -1,3 +1,20 @@
+## 3.3.0
+- **Système de confiance** : Score de confiance dynamique (0.0-1.0) pour les actions autonomes
+- **Règles dynamiques** : Actions basées sur la présence, l'heure, la météo et l'état du système
+- **Mémoire des actions** : Apprentissage continu des préférences utilisateur
+- **Intégration WebSocket** : Détection des événements Home Assistant en temps réel (< 1s de latence)
+
+## 3.2.0
+- **Polling optimisé** : Intervalle adaptatif (5-30s) selon l'activité
+- **Polling ciblé** : Récupération uniquement des entités surveillées
+- **Traitement parallèle** : 10x plus rapide avec asyncio.gather
+- **Optimisation vision** : Cooldown dynamique et priorisation des caméras
+
+## 3.1.0
+- **Webhooks HA** : Connexion WebSocket pour une réactivité temps réel
+- **Retry exponentiel** : Avec jitter pour éviter la synchronisation
+- **Fallback automatique** : Bascule en mode polling si échec
+
 # Changelog
 
 ## 3.0.3
