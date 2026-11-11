@@ -1,4 +1,13 @@
 
+## 3.6.0
+- **MonitoringAgent** : Surveillance complete du systeme (CPU, memoire, disque, reseau)
+- **SecurityAgent** : Gestion des utilisateurs, roles, permissions et authentification
+- **Alertes intelligentes** : Detection automatique des anomalies avec seuils configurables
+- **Audit complet** : Journalisation de toutes les actions de securite
+- **Protection renforcee** : Verrouillage des utilisateurs apres trop de tentatives
+- **Gestion des sessions** : Sessions avec timeout et invalidation
+
+
 ## 3.5.0
 - **Agents IA** : ConversationAgent, DecisionAgent, ActionAgent, Orchestrator pour une autonomie complète
 - **Workflow automatisé** : Conversation → Décision → Action en un seul flux
