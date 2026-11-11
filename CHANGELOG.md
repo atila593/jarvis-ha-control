@@ -1,5 +1,12 @@
+
+## 3.4.0
+- **Mémoire des préférences** : Système de mémoire des actions et des faits par utilisateur
+- **Validation vocale sécurisée** : VoiceGate avec code PIN, verrouillage après échecs, rôles admin/member/guest
+- **Tests complets** : 45+ tests unitaires pour la mémoire et la validation vocale
+- **Intégration Store** : Gestion des faits (facts) persistants dans SQLite
+
 ## 3.3.1
-- **FIX: Correction bug pickle** : Remplacement des threading.Lock() par des transactions SQLite + impl\u00e9mentation de __getstate__/__setstate__ pour permettre la s\u00e9rialisation de l'objet Store
+- **FIX: Correction bug pickle** : Remplacement des threading.Lock() par des transactions SQLite + implémentation de __getstate__/__setstate__ pour permettre la sérialisation de l'objet Store
 
 ## 3.3.0
 - **Système de confiance** : Score de confiance dynamique (0.0-1.0) pour les actions autonomes
