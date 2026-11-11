@@ -9,7 +9,7 @@ import asyncio
 import logging
 import sqlite3
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional, TypeVar, Union
+from typing import Any, AsyncIterator, Dict, Generic, List, Optional, TypeVar, Union
 
 import aiohttp
 

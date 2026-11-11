@@ -2,9 +2,8 @@ import asyncio
 import logging
 
 import httpx
-import google.generativeai as genai
-from google.generativeai import types
-from google.api_core import exceptions as google_exceptions
+import google.genai as genai
+from google.genai import types
 
 import config
 from assistant.prompts import system_prompt
@@ -32,21 +31,50 @@ class GeminiUnavailable(Exception):
 
 
 def quota_info(exc) -> tuple[int | None, str | None, str]:
-    """(secondes avant réessai, identifiant du quota dépassé, message de Google) tirés d'une erreur APIError."""
-    body = getattr(exc, "details", None)
-    err = (body.get("error", body) if isinstance(body, dict) else None) or {}
-    retry, quota = None, None
-    for d in err.get("details") or []:
-        kind = str(d.get("@type", ""))
-        if kind.endswith("RetryInfo"):
+    """(secondes avant réessai, identifiant du quota dépassé, message de Google) tirés d'une erreur API."""
+    # Essayer d'extraire les infos de quota depuis différentes sources
+    retry, quota, detail = None, None, ""
+    
+    # Pour les erreurs Google GenAI / HTTP
+    if hasattr(exc, 'response') and exc.response:
+        # Erreur HTTP avec réponse
+        resp = exc.response
+        if hasattr(resp, 'json'):
             try:
-                retry = int(float(str(d.get("retryDelay", "")).rstrip("s")))
-            except ValueError:
+                body = resp.json()
+                err = body.get("error", body) if isinstance(body, dict) else body
+                if isinstance(err, dict):
+                    detail = str(err.get("message", ""))[:240]
+                    # Extraire retry info
+                    if "retryAfterSeconds" in err:
+                        retry = int(err["retryAfterSeconds"])
+                    # Extraire quota info
+                    if "quotaId" in err:
+                        quota = err["quotaId"]
+            except Exception:
                 pass
-        elif kind.endswith("QuotaFailure"):
-            v = (d.get("violations") or [{}])[0]
-            quota = v.get("quotaId") or v.get("quotaMetric")
-    return retry, quota, str(err.get("message", ""))[:240]
+        detail = str(getattr(resp, 'text', ''))[:240]
+    elif hasattr(exc, 'details'):
+        # Ancien format (google-generativeai)
+        body = exc.details
+        err = (body.get("error", body) if isinstance(body, dict) else None) or {}
+        detail = str(err.get("message", ""))[:240]
+        for d in err.get("details") or []:
+            kind = str(d.get("@type", ""))
+            if kind.endswith("RetryInfo"):
+                try:
+                    retry = int(float(str(d.get("retryDelay", "")).rstrip("s")))
+                except ValueError:
+                    pass
+            elif kind.endswith("QuotaFailure"):
+                v = (d.get("violations") or [{}])[0]
+                quota = v.get("quotaId") or v.get("quotaMetric")
+    elif hasattr(exc, 'status_code'):
+        detail = f"HTTP {exc.status_code}: {str(exc)}"
+    else:
+        detail = str(exc)[:240]
+    
+    return retry, quota, detail
 
 
 class JarvisEngine:
@@ -128,9 +156,18 @@ class JarvisEngine:
                     last_error = "délai dépassé"
                     logger.warning("%s: délai dépassé (essai %d)", model, attempt + 1)
                 except Exception as e:
-                    # Capture les erreurs API (GoogleAPICallError, GenerativeAIError, etc.)
-                    if hasattr(e, 'code') and hasattr(e, 'status'):
-                        last_error = f"{e.code} {e.status}"
+                    # Capture les erreurs API (GenAIError, HTTP errors, etc.)
+                    if hasattr(e, 'status_code'):
+                        # Erreurs HTTP standard
+                        last_error = f"{e.status_code}"
+                        retry_after, quota, detail = quota_info(e)
+                        logger.warning("%s: %s (essai %d) quota=%s retry=%ss — %s", model, last_error, attempt + 1,
+                                       quota, retry_after, detail)
+                        if e.status_code not in RETRYABLE:
+                            break  # erreur définitive pour ce modèle → modèle suivant
+                    elif hasattr(e, 'code'):
+                        # Erreurs GenAI
+                        last_error = f"{e.code}"
                         retry_after, quota, detail = quota_info(e)
                         logger.warning("%s: %s (essai %d) quota=%s retry=%ss — %s", model, last_error, attempt + 1,
                                        quota, retry_after, detail)
