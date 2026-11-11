@@ -1,10 +1,14 @@
 {
-  "version": "4.0.0",
-  "build_date": "2026-11-11T15:30:00Z",
+  "version": "4.0.3",
+  "build_date": "2026-11-11T17:00:00Z",
   "git_commit": null,
-  "git_branch": "vibe/ui-improvements-4.0.0",
+  "git_branch": "main",
   "is_dev": false,
   "changelog": [
+    "FIX: Migration vers le package google-genai (google-generativeai est obsolète)",
+    "FIX: Correction de l'import Generic dans connection_pool.py et batch_processor.py",
+    "FIX: Correction de l'import WebSocket (extra_headers → headers)",
+    "FIX: Ajout des dépendances manquantes (aiohttp, httpx, websockets)",
     "NOUVEAU: Dashboard futuriste sans scroll avec design IA autonome",
     "NOUVEAU: Sélecteur d'entités dropdown avec recherche et catégories",
     "NOUVEAU: Zone d'activité en temps réel (actions en cours, dernières actions, décisions autonomes)",
