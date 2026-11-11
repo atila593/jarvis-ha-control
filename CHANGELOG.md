@@ -1,4 +1,17 @@
 
+## 4.0.0
+- **Dashboard futuriste** : Design IA autonome sans scroll avec animations et effets lumineux
+- **Sélecteur d'entités dropdown** : Menu déroulant intelligent avec recherche et catégories pour toutes les entités HA
+- **Zone d'activité en temps réel** : Affichage live des actions en cours, dernières actions et décisions autonomes
+- **Configuration avec menus déroulants** : Sélection facile des entités dans l'interface de configuration de l'addon
+- **Design tactile-friendly** : Boutons adaptés aux écrans tactiles avec taille minimale de 48x48px
+- **Design responsive** : Adapté aux écrans mobile, tablette et desktop
+- **Nouveaux endpoints API** : /api/entities et /api/realtime-activity pour le dashboard
+- **Configuration améliorée** : Fichier config.json avec sélecteurs natifs pour Home Assistant
+- **Catégorisation automatique** : Les entités sont automatiquement classées par type (Lumières, Volets, Caméras, etc.)
+- **Boutons d'action rapide** : Accès direct aux commandes courantes (Tout allumer, Tout éteindre, etc.)
+- **Amélioration UX** : Meilleure expérience utilisateur avec feedback visuel en temps réel
+
 ## 3.9.0
 - **Documentation complete** : Documentation technique et utilisateur complete (README, INSTALLATION, CONFIGURATION, USER_GUIDE, API_REFERENCE, ARCHITECTURE, TECHNICAL)
 - **Revue finale** : Revue complete du code, optimisation et validation

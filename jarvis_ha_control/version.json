@@ -1,24 +1,39 @@
 {
-  "version": "3.8.0",
-  "build_date": "2026-11-11T15:00:00Z",
+  "version": "4.0.0",
+  "build_date": "2026-11-11T15:30:00Z",
   "git_commit": null,
-  "git_branch": "vibe/j9-integration-3.8.0",
-  "is_dev": true,
+  "git_branch": "vibe/ui-improvements-4.0.0",
+  "is_dev": false,
   "changelog": [
-    "Tests d'int\u00e9gration compl\u00e8te",
-    "Syst\u00e8me de versionnement automatique",
-    "Notifications de mise \u00e0 jour",
-    "Int\u00e9gration compl\u00e8te des modules",
-    "Tests de stress et de performance"
+    "NOUVEAU: Dashboard futuriste sans scroll avec design IA autonome",
+    "NOUVEAU: Sélecteur d'entités dropdown avec recherche et catégories",
+    "NOUVEAU: Zone d'activité en temps réel (actions en cours, dernières actions, décisions autonomes)",
+    "NOUVEAU: Configuration de l'addon avec menus déroulants pour les entités",
+    "NOUVEAU: Boutons tactiles adaptés aux écrans tactiles",
+    "NOUVEAU: Endpoint /api/entities pour récupérer toutes les entités HA",
+    "NOUVEAU: Endpoint /api/realtime-activity pour l'activité en temps réel",
+    "AMÉLIORATION: Design responsive pour mobile, tablette et desktop",
+    "AMÉLIORATION: Animations futuristes (orb, badge LIVE, effets lumineux)",
+    "AMÉLIORATION: Catégorisation automatique des entités par type",
+    "AMÉLIORATION: Boutons d'action rapide pour les commandes courantes",
+    "FIX: Correction des erreurs d'affichage et de mise à jour"
   ],
   "features": [
+    "Dashboard futuriste sans scroll",
+    "Sélecteur d'entités intelligent avec dropdown",
+    "Zone d'activité en temps réel",
+    "Configuration avec menus déroulants",
+    "Design responsive et tactile-friendly",
+    "Animations IA autonome",
     "Agents IA complets",
-    "Monitoring et S\u00e9curit\u00e9",
+    "Monitoring et Sécurité",
     "Optimisation des performances",
     "Traitement par lots",
     "Mise en cache intelligente",
     "Pool de connexions",
-    "Surveillance temps r\u00e9el",
-    "Optimisation automatique"
+    "Surveillance temps réel",
+    "Optimisation automatique",
+    "Notifications de mise à jour",
+    "Système de versionnement automatique"
   ]
 }

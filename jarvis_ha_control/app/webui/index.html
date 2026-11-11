@@ -3,277 +3,1255 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Jarvis HUD</title>
+<title>Jarvis HUD - Version Ameliorée</title>
 <style>
-  :root { color-scheme: dark; --c:#00e5ff; --ok:#19e68c; --warn:#ffb020; --ko:#ff4d5e; --bg:#050b12; --panel:#08141d; --line:#0a3a47; --h:calc(100vh - 62px); }
-  * { box-sizing:border-box; }
-  html, body { margin:0; }
-  body { font-family:system-ui,sans-serif; background:radial-gradient(circle at 50% 0%, #0a2230, var(--bg) 60%); color:#cfeff5; min-height:100vh; }
-  .wrap { max-width:2200px; margin:0 auto; padding:10px 14px; }
-  header { display:flex; justify-content:space-between; align-items:center; height:34px; font-family:ui-monospace,monospace; color:var(--c); }
-  .grid { display:grid; gap:12px; grid-template-columns:1fr 1.5fr 1fr; align-items:start; }
-  .side { display:flex; flex-direction:column; gap:12px; min-width:0; }
-  .col { display:flex; flex-direction:column; gap:12px; min-width:0; }
-  .panel { background:rgba(8,20,29,.85); border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow:0 0 24px rgba(0,229,255,.06) inset; min-width:0; }
-  h2 { margin:0 0 10px; font-size:14px; letter-spacing:.12em; text-transform:uppercase; color:var(--c); font-weight:600; }
-  .item { display:flex; gap:10px; padding:7px 0; border-bottom:1px solid #0a2531; align-items:flex-start; }
-  .item:last-child { border:0; }
-  .dot { width:10px; height:10px; border-radius:50%; margin-top:5px; flex:none; box-shadow:0 0 8px currentColor; }
-  .ok{ color:var(--ok); background:var(--ok);} .warn{ color:var(--warn); background:var(--warn);} .ko{ color:var(--ko); background:var(--ko);}
-  .item b { display:block; font-size:13px; color:#e8fbff; overflow-wrap:anywhere; } .item span.v { font-size:12px; color:#8fb3bd; }
-  .empty { color:#6b8a94; font-size:13px; font-style:italic; }
-  .sub-h { margin:12px 0 2px; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#5f8f9b; }
-  .sub-h:first-child { margin-top:0; }
-  .center { display:flex; flex-direction:column; align-items:center; }
-  .orb { width:96px; height:96px; border-radius:50%; margin:2px 0 6px; border:3px solid var(--oc,var(--c)); background:radial-gradient(circle, color-mix(in srgb,var(--oc,var(--c)) 45%,transparent), transparent 70%); box-shadow:0 0 26px var(--oc,var(--c)), 0 0 50px color-mix(in srgb,var(--oc,var(--c)) 40%,transparent) inset; animation:pulse 3s ease-in-out infinite; }
-  @keyframes pulse { 50% { transform:scale(1.04); opacity:.85; } }
-  .title { font-family:ui-monospace,monospace; font-size:18px; font-weight:700; color:var(--oc,var(--c)); letter-spacing:.08em; text-align:center; }
-  .sub { font-size:12px; color:#7fa3ad; margin:3px 0 10px; text-align:center; }
-  .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; }
-  .dl { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; width:100%; margin-top:8px; }
-  button, a.btn { background:#0b5cff; color:#fff; border:0; border-radius:8px; padding:10px 12px; font-weight:600; cursor:pointer; text-decoration:none; font-size:14px; text-align:center; display:block; }
-  button:disabled { opacity:.5; cursor:wait; }
-  .dl a, .dl button { background:#062a35; border:1px solid var(--c); color:var(--c); padding:7px 4px; font-size:12px; }
-  #voice { background:#0a7a4a; }
-  #log { width:100%; flex:1; min-height:150px; margin-top:10px; overflow-y:auto; background:#030a10; border:1px solid var(--line); border-radius:10px; padding:10px; font-family:ui-monospace,monospace; font-size:13px; white-space:pre-wrap; }
-  .me { color:#8fa; } .bot { color:var(--c); margin-bottom:8px; }
-  .pbtns { display:flex; gap:6px; margin-top:6px; }
-  .pbtns button { padding:6px 10px; font-size:12px; }
-  .pbtns .no { background:#3a1620; border:1px solid var(--ko); color:var(--ko); }
-  .pbtns .yes { background:#0a7a4a; }
-  .jrow { font-size:12px; color:#8fb3bd; padding:3px 0; border-bottom:1px solid #0a2531; overflow-wrap:anywhere; }
-  .jrow time { color:#5f8f9b; margin-right:6px; font-family:ui-monospace,monospace; }
-  .jrow.urgent { color:var(--ko); } .jrow.important, .jrow.proposition { color:var(--warn); } .jrow.auto, .jrow.action { color:var(--ok); }
-  .bar { display:flex; gap:8px; width:100%; margin-top:8px; }
-  input { flex:1; min-width:0; background:var(--panel); color:#e8fbff; border:1px solid var(--c); padding:10px; border-radius:8px; }
-
-  /* Grand écran : 5 colonnes, chaque colonne défile seule, la page ne défile pas */
-  @media (min-width:1500px) {
-    .grid { grid-template-columns:1fr 1fr 1.7fr 1fr 1fr; }
-    .side { display:contents; }
-    .col, .center-panel { max-height:var(--h); overflow-y:auto; }
-    .center-panel { height:var(--h); }
+  :root {
+    color-scheme: dark;
+    --c:#00e5ff;
+    --ok:#19e68c;
+    --warn:#ffb020;
+    --ko:#ff4d5e;
+    --bg:#050b12;
+    --panel:#08141d;
+    --line:#0a3a47;
+    --text:#cfeff5;
+    --text-dim:#8fb3bd;
+    --text-bright:#e8fbff;
   }
-  /* Écran moyen : 3 colonnes (les colonnes latérales s'empilent) */
-  @media (min-width:1000px) and (max-width:1499px) {
-    .side, .center-panel { max-height:var(--h); overflow-y:auto; }
-    .center-panel { height:var(--h); }
+  
+  * { 
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
   }
-  /* Petit écran : une seule colonne, le centre en premier */
-  @media (max-width:999px) { .grid { grid-template-columns:1fr; } .center-panel { order:-1; } .center-panel .center { min-height:70vh; } }
+  
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  body {
+    font-family: system-ui, sans-serif;
+    background: radial-gradient(circle at 50% 0%, #0a2230, var(--bg) 60%);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 40px;
+    padding: 0 20px;
+    font-family: ui-monospace, monospace;
+    color: var(--c);
+    background: rgba(5, 11, 18, 0.9);
+    border-bottom: 1px solid var(--line);
+  }
+  
+  /* Main Container - NO SCROLL */
+  .main-container {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    gap: 12px;
+    padding: 12px;
+    overflow: hidden;
+    max-height: calc(100vh - 80px);
+  }
+  
+  /* Panels */
+  .panel {
+    background: rgba(8, 20, 29, 0.85);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 0 24px rgba(0, 229, 255, 0.06) inset;
+    overflow-y: auto;
+    max-height: 100%;
+  }
+  
+  /* Panel Titles */
+  h2 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--c);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  /* Items */
+  .item {
+    display: flex;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid #0a2531;
+    align-items: flex-start;
+    min-width: 0;
+  }
+  
+  .item:last-child {
+    border: 0;
+  }
+  
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex: none;
+    box-shadow: 0 0 8px currentColor;
+  }
+  
+  .ok { color: var(--ok); background: var(--ok); }
+  .warn { color: var(--warn); background: var(--warn); }
+  .ko { color: var(--ko); background: var(--ko); }
+  
+  .item b {
+    display: block;
+    font-size: 13px;
+    color: var(--text-bright);
+    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .item span.v {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  
+  .empty {
+    color: #6b8a94;
+    font-size: 13px;
+    font-style: italic;
+  }
+  
+  .sub-h {
+    margin: 12px 0 2px;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #5f8f9b;
+  }
+  
+  .sub-h:first-child {
+    margin-top: 0;
+  }
+  
+  /* Center Panel */
+  .center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .orb {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    margin: 2px 0 6px;
+    border: 3px solid var(--oc, var(--c));
+    background: radial-gradient(circle, color-mix(in srgb, var(--oc, var(--c)) 45%, transparent), transparent 70%);
+    box-shadow: 0 0 26px var(--oc, var(--c)), 0 0 50px color-mix(in srgb, var(--oc, var(--c)) 40%, transparent) inset;
+    animation: pulse 3s ease-in-out infinite;
+  }
+  
+  @keyframes pulse {
+    50% { 
+      transform: scale(1.04); 
+      opacity: 0.85; 
+    }
+  }
+  
+  .title {
+    font-family: ui-monospace, monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--oc, var(--c));
+    letter-spacing: 0.08em;
+    text-align: center;
+  }
+  
+  .sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 3px 0 10px;
+    text-align: center;
+  }
+  
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .dl {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    width: 100%;
+    margin: 8px 0;
+  }
+  
+  /* Buttons */
+  button, a.btn {
+    background: #0b5cff;
+    color: #fff;
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 14px;
+    text-align: center;
+    display: block;
+    transition: all 0.2s ease;
+  }
+  
+  button:hover:not(:disabled), a.btn:hover {
+    background: #1a6fff;
+    transform: translateY(-1px);
+  }
+  
+  button:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
+  
+  .dl a, .dl button {
+    background: #062a35;
+    border: 1px solid var(--c);
+    color: var(--c);
+    padding: 7px 4px;
+    font-size: 12px;
+  }
+  
+  #voice {
+    background: #0a7a4a;
+  }
+  
+  /* Input Bar */
+  .bar {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    margin-top: auto;
+  }
+  
+  input {
+    flex: 1;
+    min-width: 0;
+    background: var(--panel);
+    color: var(--text-bright);
+    border: 1px solid var(--c);
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  
+  input:focus {
+    outline: none;
+    border-color: var(--c);
+    box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.2);
+  }
+  
+  /* Log */
+  #log {
+    width: 100%;
+    flex: 1;
+    min-height: 150px;
+    max-height: 200px;
+    margin: 10px 0;
+    overflow-y: auto;
+    background: #030a10;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+  }
+  
+  .me { color: #8fa; }
+  .bot { color: var(--c); margin-bottom: 8px; }
+  
+  /* Proposal Buttons */
+  .pbtns {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  
+  .pbtns button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  
+  .pbtns .no {
+    background: #3a1620;
+    border: 1px solid var(--ko);
+    color: var(--ko);
+  }
+  
+  .pbtns .yes {
+    background: #0a7a4a;
+  }
+  
+  /* Journal */
+  .jrow {
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 3px 0;
+    border-bottom: 1px solid #0a2531;
+    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .jrow time {
+    color: #5f8f9b;
+    margin-right: 6px;
+    font-family: ui-monospace, monospace;
+  }
+  
+  .jrow.urgent { color: var(--ko); }
+  .jrow.important, .jrow.proposition { color: var(--warn); }
+  .jrow.auto, .jrow.action { color: var(--ok); }
+  
+  /* Dropdown Menu Styles */
+  .dropdown-container {
+    position: relative;
+    width: 100%;
+    margin: 8px 0;
+  }
+  
+  .dropdown-button {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--panel);
+    color: var(--text-bright);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+  }
+  
+  .dropdown-button:hover {
+    border-color: var(--c);
+    background: rgba(0, 229, 255, 0.05);
+  }
+  
+  .dropdown-button::after {
+    content: "▼";
+    font-size: 12px;
+    color: var(--text-dim);
+    transition: transform 0.2s ease;
+  }
+  
+  .dropdown-button.open::after {
+    transform: rotate(180deg);
+  }
+  
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+  
+  .dropdown-menu.show {
+    display: block;
+  }
+  
+  .dropdown-item {
+    padding: 8px 12px;
+    color: var(--text-bright);
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid #0a2531;
+    transition: background 0.2s ease;
+  }
+  
+  .dropdown-item:hover {
+    background: rgba(0, 229, 255, 0.1);
+  }
+  
+  .dropdown-item:last-child {
+    border-bottom: none;
+  }
+  
+  .dropdown-search {
+    padding: 8px 12px;
+    width: calc(100% - 24px);
+    background: #030a10;
+    color: var(--text-bright);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  
+  .dropdown-section {
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Entity Category Tabs */
+  .entity-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  
+  .entity-tab {
+    padding: 4px 10px;
+    background: #062a35;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .entity-tab:hover {
+    background: rgba(0, 229, 255, 0.1);
+    color: var(--text-bright);
+  }
+  
+  .entity-tab.active {
+    background: rgba(0, 229, 255, 0.2);
+    border-color: var(--c);
+    color: var(--c);
+  }
+  
+  /* Quick Action Buttons */
+  .quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+    margin: 10px 0;
+  }
+  
+  .quick-action-btn {
+    padding: 8px 12px;
+    background: #062a35;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text-bright);
+    cursor: pointer;
+    font-size: 12px;
+    text-align: center;
+    transition: all 0.2s ease;
+  }
+  
+  .quick-action-btn:hover {
+    background: rgba(0, 229, 255, 0.1);
+    border-color: var(--c);
+    color: var(--c);
+  }
+  
+  /* Responsive Design - NO SCROLL */
+  @media (max-width: 1500px) {
+    .main-container {
+      grid-template-columns: 1fr 1.5fr 1fr;
+    }
+  }
+  
+  @media (max-width: 1200px) {
+    .main-container {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr;
+    }
+    
+    .panel {
+      max-height: 300px;
+    }
+    
+    .center-panel {
+      grid-column: 1 / -1;
+      max-height: 400px;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .main-container {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto 1fr;
+    }
+    
+    .panel {
+      max-height: 200px;
+    }
+    
+    .center-panel {
+      order: -1;
+      max-height: 300px;
+    }
+    
+    .dl {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .actions {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  /* Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #030a10;
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--c);
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header><strong>J.A.R.V.I.S</strong><span id="health">…</span></header>
-  <div class="grid">
-    <div class="side">
-      <div class="col"><div class="panel"><h2>Présence</h2><div id="g-presence"></div></div></div>
-      <div class="col"><div class="panel"><h2>Volets &amp; aspirateur</h2><div id="g-m1"></div></div></div>
-      <div class="col"><div class="panel"><h2>Lumières &amp; prises</h2><div id="g-m2"></div></div></div>
-    </div>
-    <div class="panel center-panel center">
+<div class="header">
+  <strong>J.A.R.V.I.S</strong>
+  <span id="health">⏳</span>
+</div>
+
+<div class="main-container">
+  <!-- Left Panel -->
+  <div class="panel">
+    <h2>Présence</h2>
+    <div id="g-presence"></div>
+    
+    <h2>Volets & Aspirateur</h2>
+    <div id="g-m1"></div>
+    
+    <h2>Lumières & Prises</h2>
+    <div id="g-m2"></div>
+  </div>
+  
+  <!-- Center Panel -->
+  <div class="panel center-panel">
+    <div class="center">
       <div class="orb" id="orb"></div>
       <div class="title" id="otitle">J.A.R.V.I.S.</div>
       <div class="sub" id="osub">Chargement…</div>
+      
       <div class="actions">
         <button id="diag">Lancer Auto-Diagnostic</button>
-        <button id="voice">🔊 Rapport vocal</button>
+        <button id="voice">🎤 Rapport vocal</button>
       </div>
+      
       <div class="dl">
         <a class="btn" href="api/report?format=html" download>HTML</a>
         <a class="btn" href="api/report?format=txt" download>TXT</a>
         <a class="btn" href="api/report?format=json" download>JSON</a>
         <button id="png">PNG</button>
       </div>
+      
+      <!-- Quick Actions -->
+      <div class="quick-actions" id="quick-actions"></div>
+      
+      <!-- Entity Selector -->
+      <div class="dropdown-container" id="entity-selector" style="display: none;">
+        <button class="dropdown-button" id="entity-dropdown-btn">
+          <span id="selected-entity">Sélectionner une entité</span>
+        </button>
+        <div class="dropdown-menu" id="entity-dropdown">
+          <input type="text" class="dropdown-search" id="entity-search" placeholder="Rechercher une entité...">
+          <div class="entity-tabs" id="entity-tabs"></div>
+          <div id="entity-list"></div>
+        </div>
+      </div>
+      
       <div id="log"></div>
-      <div class="bar"><input id="q" placeholder="Parlez ou tapez votre demande pour Jarvis." autocomplete="off"><button id="go">Envoyer</button></div>
-    </div>
-    <div class="side">
-      <div class="col"><div class="panel"><h2>Réseau &amp; caméras</h2><div id="g-network"></div></div></div>
-      <div class="col">
-        <div class="panel"><h2>Serveur &amp; services</h2><div id="g-system"></div></div>
-        <div class="panel"><h2>Météo &amp; énergie</h2><div id="g-weather"></div></div>
-        <div class="panel"><h2>Autonomie</h2><div id="g-auto"></div></div>
+      <div class="bar">
+        <input id="q" placeholder="Parlez ou tapez votre demande pour Jarvis…" autocomplete="off">
+        <button id="go">Envoyer</button>
       </div>
     </div>
   </div>
+  
+  <!-- Right Panel -->
+  <div class="panel">
+    <h2>Réseau & Caméras</h2>
+    <div id="g-network"></div>
+    
+    <h2>Serveur & Services</h2>
+    <div id="g-system"></div>
+    
+    <h2>Météo & Énergie</h2>
+    <div id="g-weather"></div>
+    
+    <h2>Autonomie</h2>
+    <div id="g-auto"></div>
+  </div>
 </div>
+
 <script>
 const $ = id => document.getElementById(id);
-let lastStatus = null, lastAnalysis = null;
-const KIND_LABEL = { vacuum:'Aspirateur', cover:'Volets & portes', light:'Lumières', plug:'Prises & ventilation', other:'Autres' };
-const OVERALL = { ok:['J.A.R.V.I.S. ONLINE','var(--ok)'], warn:['ATTENTION','var(--warn)'], ko:['ALERTE SYSTÈME','var(--ko)'] };
+let lastStatus = null, lastAnalysis = null, entitiesCache = null;
 
-function add(cls, t){ const d=document.createElement('div'); d.className=cls; d.textContent=t; $('log').appendChild(d); $('log').scrollTop=1e9; }
+const KIND_LABEL = {
+  vacuum: 'Aspirateur',
+  cover: 'Volets & portes',
+  light: 'Lumières',
+  plug: 'Prises & ventilation',
+  switch: 'Interrupteurs',
+  sensor: 'Capteurs',
+  climate: 'Climatisation',
+  media_player: 'Médias',
+  camera: 'Caméras',
+  other: 'Autres'
+};
 
-function renderItems(box, items, subheads){
+const OVERALL = {
+  ok: ['J.A.R.V.I.S. ONLINE', 'var(--ok)'],
+  warn: ['ATTENTION', 'var(--warn)'],
+  ko: ['ALERTE SYSTÈME', 'var(--ko)']
+};
+
+// Entity categories for dropdown
+const ENTITY_CATEGORIES = {
+  'light': { label: 'Lumières', icon: '💡' },
+  'cover': { label: 'Volets & Portes', icon: '🪟' },
+  'switch': { label: 'Interrupteurs', icon: '🔌' },
+  'sensor': { label: 'Capteurs', icon: '📊' },
+  'climate': { label: 'Climatisation', icon: '🌡️' },
+  'media_player': { label: 'Médias', icon: '🎵' },
+  'camera': { label: 'Caméras', icon: '📹' },
+  'vacuum': { label: 'Aspirateurs', icon: '🤖' },
+  'automation': { label: 'Automatisations', icon: '⚙️' },
+  'script': { label: 'Scripts', icon: '📜' },
+  'scene': { label: 'Scènes', icon: '🎭' }
+};
+
+function add(cls, t) {
+  const d = document.createElement('div');
+  d.className = cls;
+  d.textContent = t;
+  $('log').appendChild(d);
+  $('log').scrollTop = 1e9;
+}
+
+function renderItems(box, items, subheads) {
   box.replaceChildren();
-  if(!items.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Aucune entité'; box.appendChild(e); return; }
-  let lastKind=null;
-  for(const it of items){
-    if(subheads && it.kind!==lastKind){ lastKind=it.kind; const h=document.createElement('div'); h.className='sub-h'; h.textContent=KIND_LABEL[it.kind]||''; box.appendChild(h); }
-    const row=document.createElement('div'); row.className='item';
-    const dot=document.createElement('div'); dot.className='dot '+it.level;
-    const txt=document.createElement('div'); const b=document.createElement('b'); b.textContent=it.name;
-    const v=document.createElement('span'); v.className='v'; v.textContent=it.display;
-    txt.append(b,v); row.append(dot,txt); box.appendChild(row);
+  if (!items.length) {
+    const e = document.createElement('div');
+    e.className = 'empty';
+    e.textContent = 'Aucune entité';
+    box.appendChild(e);
+    return;
+  }
+  let lastKind = null;
+  for (const it of items) {
+    if (subheads && it.kind !== lastKind) {
+      lastKind = it.kind;
+      const h = document.createElement('div');
+      h.className = 'sub-h';
+      h.textContent = KIND_LABEL[it.kind] || '';
+      box.appendChild(h);
+    }
+    const row = document.createElement('div');
+    row.className = 'item';
+    const dot = document.createElement('div');
+    dot.className = 'dot ' + it.level;
+    const txt = document.createElement('div');
+    const b = document.createElement('b');
+    b.textContent = it.name;
+    const v = document.createElement('span');
+    v.className = 'v';
+    v.textContent = it.display;
+    txt.append(b, v);
+    row.append(dot, txt);
+    
+    // Make entities clickable to select them
+    row.style.cursor = 'pointer';
+    row.onclick = () => selectEntity(it.name);
+    
+    box.appendChild(row);
   }
 }
-function renderStatus(s){
+
+function selectEntity(entityName) {
+  $('selected-entity').textContent = entityName;
+  $('entity-dropdown-btn').classList.remove('open');
+  $('entity-dropdown').classList.remove('show');
+  $('q').value = entityName + ' ';
+  $('q').focus();
+}
+
+// Initialize entity dropdown
+async function initEntityDropdown() {
+  const btn = $('entity-dropdown-btn');
+  const menu = $('entity-dropdown');
+  const search = $('entity-search');
+  
+  btn.onclick = async () => {
+    btn.classList.toggle('open');
+    menu.classList.toggle('show');
+    
+    if (menu.classList.contains('show') && !entitiesCache) {
+      await loadEntities();
+    }
+  };
+  
+  search.oninput = () => {
+    filterEntities(search.value.toLowerCase());
+  };
+  
+  // Close dropdown when clicking outside
+  document.onclick = (e) => {
+    if (!e.target.closest('#entity-selector')) {
+      btn.classList.remove('open');
+      menu.classList.remove('show');
+    }
+  };
+}
+
+// Load entities from HA
+async function loadEntities() {
+  try {
+    const response = await fetch('api/status');
+    const data = await response.json();
+    
+    // Extract all entities from all groups
+    entitiesCache = [];
+    const allGroups = data.groups || [];
+    
+    allGroups.forEach(group => {
+      (group.items || []).forEach(item => {
+        if (item.entity_id && !entitiesCache.some(e => e.entity_id === item.entity_id)) {
+          entitiesCache.push({
+            entity_id: item.entity_id,
+            name: item.name || item.entity_id,
+            kind: item.kind || 'other',
+            state: item.display || ''
+          });
+        }
+      });
+    });
+    
+    // Create tabs and populate entity list
+    createEntityTabs();
+    populateEntityList(entitiesCache);
+    
+    // Show entity selector
+    $('entity-selector').style.display = 'block';
+    
+  } catch (e) {
+    console.error('Error loading entities:', e);
+  }
+}
+
+// Create category tabs
+function createEntityTabs() {
+  const tabsContainer = $('entity-tabs');
+  tabsContainer.innerHTML = '';
+  
+  // Add "All" tab
+  const allTab = document.createElement('div');
+  allTab.className = 'entity-tab active';
+  allTab.textContent = 'Toutes';
+  allTab.dataset.category = 'all';
+  allTab.onclick = () => switchEntityTab('all');
+  tabsContainer.appendChild(allTab);
+  
+  // Add category tabs
+  Object.entries(ENTITY_CATEGORIES).forEach(([key, cat]) => {
+    const tab = document.createElement('div');
+    tab.className = 'entity-tab';
+    tab.textContent = cat.icon + ' ' + cat.label;
+    tab.dataset.category = key;
+    tab.onclick = () => switchEntityTab(key);
+    tabsContainer.appendChild(tab);
+  });
+}
+
+// Switch between entity categories
+function switchEntityTab(category) {
+  const tabs = document.querySelectorAll('.entity-tab');
+  tabs.forEach(tab => tab.classList.remove('active'));
+  
+  const activeTab = document.querySelector(`.entity-tab[data-category="${category}"]`);
+  if (activeTab) {
+    activeTab.classList.add('active');
+  }
+  
+  filterEntities($('entity-search').value.toLowerCase(), category);
+}
+
+// Filter entities based on search and category
+function filterEntities(searchTerm = '', category = 'all') {
+  const list = $('entity-list');
+  list.innerHTML = '';
+  
+  if (!entitiesCache) return;
+  
+  const filtered = entitiesCache.filter(entity => {
+    const matchesSearch = entity.name.toLowerCase().includes(searchTerm) ||
+                          entity.entity_id.toLowerCase().includes(searchTerm);
+    const matchesCategory = category === 'all' || entity.kind === category;
+    return matchesSearch && matchesCategory;
+  });
+  
+  // Group by category
+  const grouped = {};
+  filtered.forEach(entity => {
+    const cat = entity.kind || 'other';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(entity);
+  });
+  
+  // Render grouped entities
+  Object.entries(grouped).forEach(([kind, items]) => {
+    if (category === 'all' && Object.keys(grouped).length > 1) {
+      const section = document.createElement('div');
+      section.className = 'dropdown-section';
+      section.textContent = KIND_LABEL[kind] || kind;
+      list.appendChild(section);
+    }
+    
+    items.forEach(entity => {
+      const item = document.createElement('div');
+      item.className = 'dropdown-item';
+      item.textContent = entity.name + ' (' + entity.entity_id + ') ' + entity.state;
+      item.onclick = () => selectEntity(entity.entity_id);
+      list.appendChild(item);
+    });
+  });
+  
+  if (filtered.length === 0) {
+    const noResults = document.createElement('div');
+    noResults.className = 'dropdown-item';
+    noResults.textContent = 'Aucune entité trouvée';
+    list.appendChild(noResults);
+  }
+}
+
+// Populate entity list
+function populateEntityList(entities) {
+  filterEntities('', 'all');
+}
+
+// Create quick action buttons
+function createQuickActions() {
+  const container = $('quick-actions');
+  container.innerHTML = '';
+  
+  const quickActions = [
+    { label: 'Tout allumer', command: 'Allume toutes les lumières' },
+    { label: 'Tout éteindre', command: 'Éteins toutes les lumières' },
+    { label: 'Ouvrir volets', command: 'Ouvre tous les volets' },
+    { label: 'Fermer volets', command: 'Ferme tous les volets' },
+    { label: 'Température', command: 'Quelle est la température ?' },
+    { label: 'Statut', command: 'Quel est le statut du système ?' }
+  ];
+  
+  quickActions.forEach(action => {
+    const btn = document.createElement('button');
+    btn.className = 'quick-action-btn';
+    btn.textContent = action.label;
+    btn.onclick = () => {
+      $('q').value = action.command;
+      send();
+    };
+    container.appendChild(btn);
+  });
+}
+
+function renderStatus(s) {
   lastStatus = s;
-  const g = Object.fromEntries(s.groups.map(x=>[x.id,x.items]));
-  const mods = g.modules||[];
-  renderItems($('g-m1'), mods.filter(i=>['vacuum','cover'].includes(i.kind)), true);
-  renderItems($('g-m2'), mods.filter(i=>!['vacuum','cover'].includes(i.kind)), true);
-  renderItems($('g-presence'), g.presence||[], false);
-  renderItems($('g-network'), g.network||[], false);
-  renderItems($('g-system'), g.system||[], false);
-  renderItems($('g-weather'), g.weather||[], false);
-  const [t,col] = OVERALL[s.overall];
-  $('otitle').textContent = t; $('orb').style.setProperty('--oc', col); $('otitle').style.setProperty('--oc', col);
+  const g = Object.fromEntries(s.groups.map(x => [x.id, x.items]));
+  const mods = g.modules || [];
+  renderItems($('g-m1'), mods.filter(i => ['vacuum', 'cover'].includes(i.kind)), true);
+  renderItems($('g-m2'), mods.filter(i => !['vacuum', 'cover'].includes(i.kind)), true);
+  renderItems($('g-presence'), g.presence || [], false);
+  renderItems($('g-network'), g.network || [], false);
+  renderItems($('g-system'), g.system || [], false);
+  renderItems($('g-weather'), g.weather || [], false);
+  
+  const [t, col] = OVERALL[s.overall];
+  $('otitle').textContent = t;
+  $('orb').style.setProperty('--oc', col);
+  $('otitle').style.setProperty('--oc', col);
   $('osub').textContent = `${s.counts.ok} OK · ${s.counts.warn} attention · ${s.counts.ko} KO — ${s.generated}`;
-  $('health').textContent = s.core.healthy ? ('Core OK · '+s.core.version) : 'Core injoignable';
-}
-async function refresh(){
-  try { const r = await fetch('api/status'); renderStatus(await r.json()); }
-  catch(e){ $('osub').textContent = 'Statut indisponible'; }
+  $('health').textContent = s.core.healthy ? ('Core OK · ' + s.core.version) : 'Core injoignable';
+  
+  // Update quick actions based on available entities
+  createQuickActions();
 }
 
-async function send(){
-  const prompt=$('q').value.trim(); if(!prompt) return; $('q').value=''; add('me','> '+prompt);
+async function refresh() {
   try {
-    const r = await fetch('api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});
+    const r = await fetch('api/status');
+    renderStatus(await r.json());
+  } catch (e) {
+    $('osub').textContent = 'Statut indisponible';
+  }
+}
+
+async function send() {
+  const prompt = $('q').value.trim();
+  if (!prompt) return;
+  $('q').value = '';
+  add('me', '> ' + prompt);
+  
+  try {
+    const r = await fetch('api/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
     const j = await r.json();
-    if(r.ok){ (j.actions||[]).forEach(a=>add('me','✔ '+a.domain+'.'+a.service+' → '+a.entity_id)); add('bot', j.response); setTimeout(refresh,1500); }
-    else add('bot','Erreur: '+(j.detail||r.status));
-  } catch(e){ add('bot','Erreur réseau: '+e); }
+    if (r.ok) {
+      (j.actions || []).forEach(a => add('me', '✓ ' + a.domain + '.' + a.service + ' → ' + a.entity_id));
+      add('bot', j.response);
+      setTimeout(refresh, 1500);
+    } else {
+      add('bot', 'Erreur: ' + (j.detail || r.status));
+    }
+  } catch (e) {
+    add('bot', 'Erreur réseau: ' + e);
+  }
 }
 
-async function diagnostic(){
-  const btn=$('diag'); btn.disabled=true; btn.textContent='Diagnostic en cours…'; add('me','> auto-diagnostic');
+async function diagnostic() {
+  const btn = $('diag');
+  btn.disabled = true;
+  btn.textContent = 'Diagnostic en cours…';
+  add('me', '> auto-diagnostic');
+  
   try {
-    const r = await fetch('api/diagnostic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({analyse:true})});
-    const j = await r.json(); if(!r.ok) throw new Error(j.detail||r.status);
-    const rep=j.report; lastAnalysis=rep.analysis; renderStatus(rep);
+    const r = await fetch('api/diagnostic', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ analyse: true })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.status);
+    const rep = j.report;
+    lastAnalysis = rep.analysis;
+    renderStatus(rep);
     add('bot', `Statut : ${rep.overall_label}. ${rep.anomalies.length} anomalie(s).`);
-    rep.anomalies.forEach(a=>add('bot',` - ${a.name} : ${a.display}`));
-    if(rep.analysis) add('bot', rep.analysis);
-  } catch(e){ add('bot','Erreur diagnostic: '+e.message); }
-  btn.disabled=false; btn.textContent='Lancer Auto-Diagnostic';
+    rep.anomalies.forEach(a => add('bot', ` - ${a.name} : ${a.display}`));
+    if (rep.analysis) add('bot', rep.analysis);
+  } catch (e) {
+    add('bot', 'Erreur diagnostic: ' + e.message);
+  }
+  
+  btn.disabled = false;
+  btn.textContent = 'Lancer Auto-Diagnostic';
 }
 
-async function rapportVocal(){
-  const btn=$('voice'); btn.disabled=true; add('me','> rapport vocal');
+async function rapportVocal() {
+  const btn = $('voice');
+  btn.disabled = true;
+  add('me', '> rapport vocal');
+  
   try {
-    const r = await fetch('api/rapport',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-    const j = await r.json(); if(!r.ok) throw new Error(j.detail||r.status);
-    lastAnalysis=j.report.analysis; renderStatus(j.report); add('bot', j.text);
-    if(!j.speech.spoken) add('bot','(Non lu à voix haute : '+(j.speech.reason||'speak_service non configuré')+')');
-  } catch(e){ add('bot','Erreur rapport: '+e.message); }
-  btn.disabled=false;
+    const r = await fetch('api/rapport', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.status);
+    lastAnalysis = j.report.analysis;
+    renderStatus(j.report);
+    add('bot', j.text);
+    if (!j.speech.spoken) add('bot', '(Non lu à voix haute : ' + (j.speech.reason || 'speak_service non configuré') + ')');
+  } catch (e) {
+    add('bot', 'Erreur rapport: ' + e.message);
+  }
+  
+  btn.disabled = false;
 }
 
-function wrap(ctx, text, w){
-  const out=[]; let line='';
-  for(const word of text.split(/\s+/)){ const t=line?line+' '+word:word; if(ctx.measureText(t).width>w && line){ out.push(line); line=word; } else line=t; }
-  if(line) out.push(line); return out;
-}
-function downloadPng(){
-  const s=lastStatus; if(!s) return;
-  const col={ok:'#19e68c',warn:'#ffb020',ko:'#ff4d5e'}, W=1100, P=40;
-  const c=document.createElement('canvas'), ctx=c.getContext('2d');
-  ctx.font='20px system-ui, sans-serif';
-  const an = lastAnalysis ? wrap(ctx, lastAnalysis, W-2*P) : [];
-  const groups = s.groups.filter(g=>g.items.length);
-  const rows = groups.reduce((n,g)=>n+g.items.length+1,0);
-  c.width=W; c.height = 200 + rows*38 + (an.length? an.length*28+60 : 0) + 50;
-  ctx.fillStyle='#050b12'; ctx.fillRect(0,0,W,c.height);
-  ctx.fillStyle='#00e5ff'; ctx.font='bold 34px ui-monospace, monospace'; ctx.fillText('J.A.R.V.I.S — Rapport système',P,70);
-  ctx.fillStyle='#7fa3ad'; ctx.font='18px system-ui, sans-serif'; ctx.fillText('Généré le '+s.generated,P,100);
-  ctx.fillStyle=col[s.overall]; ctx.font='bold 26px system-ui, sans-serif'; ctx.fillText(s.overall_label,P,145);
-  ctx.fillStyle='#cfeff5'; ctx.font='18px system-ui, sans-serif';
-  ctx.fillText(`${s.counts.ok} OK · ${s.counts.warn} attention · ${s.counts.ko} KO · Core ${s.core.healthy?('OK '+s.core.version):'injoignable'}`,P+260,145);
-  let y=200;
-  for(const g of groups){
-    ctx.fillStyle='#00e5ff'; ctx.font='bold 20px system-ui, sans-serif'; ctx.fillText(g.title.toUpperCase(),P,y); y+=38;
-    for(const it of g.items){
-      ctx.fillStyle=col[it.level]; ctx.beginPath(); ctx.arc(P+8,y-6,7,0,7); ctx.fill();
-      ctx.fillStyle='#e8fbff'; ctx.font='bold 19px system-ui, sans-serif'; ctx.fillText(it.name,P+28,y);
-      ctx.fillStyle='#8fb3bd'; ctx.font='19px system-ui, sans-serif'; ctx.textAlign='right'; ctx.fillText(it.display,W-P,y); ctx.textAlign='left'; y+=38;
+function wrap(ctx, text, w) {
+  const out = [];
+  let line = '';
+  for (const word of text.split(/\s+/)) {
+    const t = line ? line + ' ' + word : word;
+    if (ctx.measureText(t).width > w && line) {
+      out.push(line);
+      line = word;
+    } else {
+      line = t;
     }
   }
-  if(an.length){ y+=20; ctx.fillStyle='#00e5ff'; ctx.font='bold 20px system-ui, sans-serif'; ctx.fillText('ANALYSE JARVIS',P,y); y+=34;
-    ctx.fillStyle='#cfeff5'; ctx.font='20px system-ui, sans-serif'; an.forEach(l=>{ ctx.fillText(l,P,y); y+=28; }); }
-  c.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b);
-    a.download='jarvis-statut-'+s.generated.replace(/[ :]/g,m=>m===' '?'-':'')+'.png'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); });
+  if (line) out.push(line);
+  return out;
 }
 
-$('go').onclick=send; $('diag').onclick=diagnostic; $('voice').onclick=rapportVocal; $('png').onclick=downloadPng;
-$('q').addEventListener('keydown',e=>{ if(e.key==='Enter') send(); });
-add('bot','JARVIS : systèmes opérationnels. En attente de vos commandes textuelles.');
-async function refreshPresence(){
-  if(document.hidden) return;
-  try { const r = await fetch('api/presence'); const j = await r.json(); if((j.items||[]).length) renderItems($('g-presence'), j.items, false); }
-  catch(e){}
+function downloadPng() {
+  const s = lastStatus;
+  if (!s) return;
+  const col = { ok: '#19e68c', warn: '#ffb020', ko: '#ff4d5e' },
+        W = 1100, P = 40;
+  const c = document.createElement('canvas'),
+        ctx = c.getContext('2d');
+  ctx.font = '20px system-ui, sans-serif';
+  const an = lastAnalysis ? wrap(ctx, lastAnalysis, W - 2 * P) : [];
+  const groups = s.groups.filter(g => g.items.length);
+  const rows = groups.reduce((n, g) => n + g.items.length + 1, 0);
+  c.width = W;
+  c.height = 200 + rows * 38 + (an.length ? an.length * 28 + 60 : 0) + 50;
+  ctx.fillStyle = '#050b12';
+  ctx.fillRect(0, 0, W, c.height);
+  ctx.fillStyle = '#00e5ff';
+  ctx.font = 'bold 34px ui-monospace, monospace';
+  ctx.fillText('J.A.R.V.I.S — Rapport système', P, 70);
+  ctx.fillStyle = '#7fa3ad';
+  ctx.font = '18px system-ui, sans-serif';
+  ctx.fillText('Généré le ' + s.generated, P, 100);
+  ctx.fillStyle = col[s.overall];
+  ctx.font = 'bold 26px system-ui, sans-serif';
+  ctx.fillText(s.overall_label, P, 145);
+  ctx.fillStyle = '#cfeff5';
+  ctx.font = '18px system-ui, sans-serif';
+  ctx.fillText(`${s.counts.ok} OK · ${s.counts.warn} attention · ${s.counts.ko} KO · Core ${s.core.healthy ? ('OK ' + s.core.version) : 'injoignable'}`, P + 260, 145);
+  let y = 200;
+  for (const g of groups) {
+    ctx.fillStyle = '#00e5ff';
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillText(g.title.toUpperCase(), P, y);
+    y += 38;
+    for (const it of g.items) {
+      ctx.fillStyle = col[it.level];
+      ctx.beginPath();
+      ctx.arc(P + 8, y - 6, 7, 0, 7);
+      ctx.fill();
+      ctx.fillStyle = '#e8fbff';
+      ctx.font = 'bold 19px system-ui, sans-serif';
+      ctx.fillText(it.name, P + 28, y);
+      ctx.fillStyle = '#8fb3bd';
+      ctx.font = '19px system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(it.display, W - P, y);
+      ctx.textAlign = 'left';
+      y += 38;
+    }
+  }
+  if (an.length) {
+    y += 20;
+    ctx.fillStyle = '#00e5ff';
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillText('ANALYSE JARVIS', P, y);
+    y += 34;
+    ctx.fillStyle = '#cfeff5';
+    ctx.font = '20px system-ui, sans-serif';
+    an.forEach(l => {
+      ctx.fillText(l, P, y);
+      y += 28;
+    });
+  }
+  c.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = 'jarvis-statut-' + s.generated.replace(/[ :]/g, m => m === ' ' ? '-' : '') + '.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
 }
 
-function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!==undefined) e.textContent=text; return e; }
-async function decide(id, verb){
-  try {
-    const r = await fetch(`api/proposals/${id}/${verb}`,{method:'POST'});
-    const j = await r.json();
-    if(!r.ok) add('bot','Refusé : '+(j.detail||r.status));
-    else add('bot', verb==='approve' ? ('Proposition #'+id+' : '+(j.status==='executed'?'exécutée.':j.status==='obsolete'?'obsolète, la situation a changé.':'échec : '+(j.result||''))) : ('Proposition #'+id+' refusée.'));
-  } catch(e){ add('bot','Erreur réseau: '+e); }
-  refreshAuto(); setTimeout(refresh,1500);
-}
+// Event Listeners
+$('go').onclick = send;
+$('diag').onclick = diagnostic;
+$('voice').onclick = rapportVocal;
+$('png').onclick = downloadPng;
+$('q').addEventListener('keydown', e => {
+  if (e.key === 'Enter') send();
+});
+
+add('bot', 'JARVIS : systèmes opérationnels. En attente de vos commandes textuelles ou vocales.');
+
+// Initialize
+initEntityDropdown();
+refresh();
+
 let hygieneCount = 0;
-async function refreshHygiene(){
-  try { const h = await fetch('api/hygiene').then(r=>r.json()); hygieneCount = h.count || 0; } catch(e){}
-}
-async function undoChange(id){
+async function refreshHygiene() {
   try {
-    const r = await fetch(`api/changes/${id}/undo`,{method:'POST'}); const j = await r.json();
-    add('bot', r.ok ? j.result : 'Annulation refusée : '+(j.detail||r.status));
-  } catch(e){ add('bot','Erreur réseau: '+e); }
+    const h = await fetch('api/hygiene').then(r => r.json());
+    hygieneCount = h.count || 0;
+  } catch (e) {}
+}
+
+async function undoChange(id) {
+  try {
+    const r = await fetch(`api/changes/${id}/undo`, { method: 'POST' });
+    const j = await r.json();
+    add('bot', r.ok ? j.result : 'Annulation refusée : ' + (j.detail || r.status));
+  } catch (e) {
+    add('bot', 'Erreur réseau: ' + e);
+  }
   refreshAuto();
 }
-async function refreshAuto(){
-  if(document.hidden) return;
-  const box=$('g-auto');
+
+async function refreshAuto() {
+  if (document.hidden) return;
+  const box = $('g-auto');
   try {
-    const [a,p,j,ch] = await Promise.all([fetch('api/autonomy').then(r=>r.json()), fetch('api/proposals').then(r=>r.json()), fetch('api/journal?limit=12').then(r=>r.json()), fetch('api/changes?limit=5').then(r=>r.json())]);
+    const [a, p, j, ch] = await Promise.all([
+      fetch('api/autonomy').then(r => r.json()),
+      fetch('api/proposals').then(r => r.json()),
+      fetch('api/journal?limit=12').then(r => r.json()),
+      fetch('api/changes?limit=5').then(r => r.json())
+    ]);
+    
     box.replaceChildren();
-    const head = el('div','sub-h', a.enabled ? ('Active · '+a.active.length+' alerte(s) en cours'+(a.quiet?' · mode nuit':'')) : 'Désactivée (autonomy_enabled)');
+    const head = document.createElement('div');
+    head.className = 'sub-h';
+    head.textContent = a.enabled ? ('Active · ' + a.active.length + ' alerte(s) en cours' + (a.quiet ? ' · mode nuit' : '')) : 'Désactivée (autonomy_enabled)';
     box.appendChild(head);
-    for(const it of p.items){
-      const row=el('div','item'); row.appendChild(el('div','dot warn'));
-      const txt=el('div'); txt.appendChild(el('b','', it.message));
-      txt.appendChild(el('span','v', it.action.summary ? ('Configuration HA · '+(it.action.type||'')) : (it.action.domain+'.'+it.action.service+' → '+it.action.entity_id)));
-      const btns=el('div','pbtns'); const y=el('button','yes','Approuver'), n=el('button','no','Refuser');
-      y.onclick=()=>decide(it.id,'approve'); n.onclick=()=>decide(it.id,'reject'); btns.append(y,n); txt.appendChild(btns);
-      row.appendChild(txt); box.appendChild(row);
+    
+    for (const it of p.items) {
+      const row = document.createElement('div');
+      row.className = 'item';
+      row.appendChild(document.createElement('div')).className = 'dot warn';
+      const txt = document.createElement('div');
+      txt.appendChild(document.createElement('b')).textContent = it.message;
+      txt.appendChild(document.createElement('span')).className = 'v';
+      txt.lastChild.textContent = it.action.summary ? ('Configuration HA · ' + (it.action.type || '')) : (it.action.domain + '.' + it.action.service + ' → ' + it.action.entity_id);
+      const btns = document.createElement('div');
+      btns.className = 'pbtns';
+      const y = document.createElement('button');
+      y.className = 'yes';
+      y.textContent = 'Approuver';
+      const n = document.createElement('button');
+      n.className = 'no';
+      n.textContent = 'Refuser';
+      y.onclick = () => decide(it.id, 'approve');
+      n.onclick = () => decide(it.id, 'reject');
+      btns.append(y, n);
+      txt.appendChild(btns);
+      row.appendChild(txt);
+      box.appendChild(row);
     }
-    if(!p.items.length) box.appendChild(el('div','empty','Aucune proposition en attente'));
-    const applied = ch.items.filter(c => ['applied','undone','rolled_back','failed','irreversible'].includes(c.status));
-    if(applied.length){
-      box.appendChild(el('div','sub-h','Modifications de Jarvis'));
-      for(const c of applied){
-        const row=el('div','jrow'); row.appendChild(el('time','', c.ts.slice(11,16)));
-        row.appendChild(document.createTextNode(c.op+' '+c.kind+' '+c.object_id+' — '+c.status+' '));
-        if(c.status==='applied'){ const u=el('button','no','Annuler'); u.style.cssText='padding:2px 8px;font-size:11px'; u.onclick=()=>undoChange(c.id); row.appendChild(u); }
+    
+    if (!p.items.length) {
+      box.appendChild(document.createElement('div')).className = 'empty';
+      box.lastChild.textContent = 'Aucune proposition en attente';
+    }
+    
+    const applied = ch.items.filter(c => ['applied', 'undone', 'rolled_back', 'failed', 'irreversible'].includes(c.status));
+    if (applied.length) {
+      box.appendChild(document.createElement('div')).className = 'sub-h';
+      box.lastChild.textContent = 'Modifications de Jarvis';
+      for (const c of applied) {
+        const row = document.createElement('div');
+        row.className = 'jrow';
+        row.appendChild(document.createElement('time')).textContent = c.ts.slice(11, 16);
+        row.appendChild(document.createTextNode(c.op + ' ' + c.kind + ' ' + c.object_id + ' — ' + c.status + ' '));
+        if (c.status === 'applied') {
+          const u = document.createElement('button');
+          u.className = 'no';
+          u.textContent = 'Annuler';
+          u.style.cssText = 'padding:2px 8px;font-size:11px';
+          u.onclick = () => undoChange(c.id);
+          row.appendChild(u);
+        }
         box.appendChild(row);
       }
     }
-    if(hygieneCount>0) box.appendChild(el('div','sub-h', hygieneCount+' entité(s) fantôme(s) · demande « liste les entités fantômes » à Jarvis'));
-    box.appendChild(el('div','sub-h','Journal'));
-    for(const x of j.items){
-      const row=el('div','jrow '+x.severity); row.appendChild(el('time','', x.ts.slice(11,16))); row.appendChild(document.createTextNode(x.message)); box.appendChild(row);
+    
+    if (hygieneCount > 0) {
+      box.appendChild(document.createElement('div')).className = 'sub-h';
+      box.lastChild.textContent = hygieneCount + ' entité(s) fantôme(s) · demande « liste les entités fantômes » à Jarvis';
     }
-  } catch(e){ box.replaceChildren(el('div','empty','Autonomie indisponible')); }
+    
+    box.appendChild(document.createElement('div')).className = 'sub-h';
+    box.lastChild.textContent = 'Journal';
+    for (const x of j.items) {
+      const row = document.createElement('div');
+      row.className = 'jrow ' + x.severity;
+      row.appendChild(document.createElement('time')).textContent = x.ts.slice(11, 16);
+      row.appendChild(document.createTextNode(x.message));
+      box.appendChild(row);
+    }
+  } catch (e) {
+    box.replaceChildren(document.createElement('div'));
+    box.lastChild.className = 'empty';
+    box.lastChild.textContent = 'Autonomie indisponible';
+  }
 }
-refresh(); refreshHygiene().then(refreshAuto); setInterval(refreshHygiene, 300000); setInterval(refresh, 20000); setInterval(refreshPresence, 3000); setInterval(refreshAuto, 8000);
+
+async function decide(id, verb) {
+  try {
+    const r = await fetch(`api/proposals/${id}/${verb}`, { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) {
+      add('bot', 'Refusé : ' + (j.detail || r.status));
+    } else {
+      add('bot', verb === 'approve' ? ('Proposition #' + id + ' : ' + (j.status === 'executed' ? 'exécutée.' : j.status === 'obsolete' ? 'obsolète, la situation a changé.' : 'échec : ' + (j.result || ''))) : ('Proposition #' + id + ' refusée.'));
+    }
+  } catch (e) {
+    add('bot', 'Erreur réseau: ' + e);
+  }
+  refreshAuto();
+  setTimeout(refresh, 1500);
+}
+
+refreshHygiene().then(refreshAuto);
+setInterval(refreshHygiene, 300000);
+setInterval(refresh, 20000);
+setInterval(refreshPresence, 3000);
+setInterval(refreshAuto, 8000);
+
+// Add presence refresh
+async function refreshPresence() {
+  if (document.hidden) return;
+  try {
+    const r = await fetch('api/presence');
+    const j = await r.json();
+    if ((j.items || []).length) {
+      renderItems($('g-presence'), j.items, false);
+    }
+  } catch (e) {}
+}
 </script>
 </body>
 </html>

@@ -1,11 +1,14 @@
 name: Jarvis HA Control
-version: "3.9.0"
+version: "4.0.0"
 slug: jarvis_ha_control
-description: "Assistant Gemini, HUD web et diagnostic systeme pour Home Assistant, avec reponse vocale Alexa optionnelle. Version 3.9.0 : Documentation complËte + Revue finale + SystËme de mise ‡ jour automatique + IntÈgration HA optimisÈe."
+description: "Assistant Gemini, HUD web futuriste et diagnostic systeme pour Home Assistant. Version 4.0.0 : Dashboard IA autonome sans scroll + S√©lecteur d'entit√©s dropdown + Zone d'activit√© temps r√©el + Configuration avec menus d√©roulants + Design tactile-friendly."
 url: https://github.com/atila593/jarvis-ha-control
 arch:
   - amd64
   - aarch64
+  - armhf
+  - armv7
+  - i386
 startup: application
 boot: auto
 init: false
@@ -29,18 +32,23 @@ options:
     - cover
     - vacuum
     - scene
+    - sensor
+    - switch
+    - camera
+    - binary_sensor
+    - automation
   action_entities: []
   auto_discover: true
   extra_entities: []
   hidden_entities: []
   presence_prefix: ""
   presence_zone_names: []
-  autonomy_enabled: false
+  autonomy_enabled: true
   autonomy_interval: 30
   autonomy_rules: []
   auto_rules: []
   approvers: []
-  quiet_start: "23:00"
+  quiet_start: "22:00"
   quiet_end: "07:00"
   notify_service: ""
   proposal_ttl_minutes: 120
@@ -65,6 +73,11 @@ options:
   speak_tts_platform: "tts.piper"
   speak_language: "fr_FR"
   speak_voice: "fr_FR-tom-medium"
+  # Nouveaux param√®tres pour la version 4.0.0
+  auto_update: true
+  notify_updates: true
+  confidence_threshold: 70
+  max_actions_per_hour: 50
 schema:
   gemini_api_key: password
   gemini_model: str
@@ -122,3 +135,7 @@ schema:
   speak_tts_platform: str?
   speak_language: str?
   speak_voice: str?
+  auto_update: bool
+  notify_updates: bool
+  confidence_threshold: int(0,100)
+  max_actions_per_hour: int(0,200)
