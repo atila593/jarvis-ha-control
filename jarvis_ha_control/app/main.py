@@ -18,11 +18,17 @@ from assistant.gemini_engine import GeminiUnavailable, JarvisEngine  # noqa: E40
 from autonomy import access  # noqa: E402
 from autonomy import rules as arules  # noqa: E402
 from autonomy.engine import AutonomyEngine, Settings  # noqa: E402
+from performance.cache import CacheManager, LRUCache  # noqa: E402
+from performance.connection_pool import DatabaseConnectionPool, HTTPConnectionPool  # noqa: E402
+from performance.batch_processor import ActionBatcher  # noqa: E402
+from performance.performance_monitor import PerformanceMonitor  # noqa: E402
+from performance.optimizer import PerformanceOptimizer, PerformanceMetrics  # noqa: E402
 from autonomy.engineer import Engineer  # noqa: E402
 from autonomy.ha import HaClient  # noqa: E402
 from autonomy.ha_websocket import HAWebSocketClient, init_websocket, close_websocket  # noqa: E402
 from autonomy.store import Store  # noqa: E402
 from autonomy.vision import Vision, VisionSettings  # noqa: E402
+from version import version_manager, get_version, get_version_info, check_for_updates  # noqa: E402
 from tools.toolbox import Toolbox  # noqa: E402
 from tools import presence  # noqa: E402
 from tools.actions import ActionRunner  # noqa: E402
@@ -33,19 +39,28 @@ from tools.sys_diagnose import SystemDiagnose  # noqa: E402
 logging.basicConfig(level=config.LOG_LEVEL)
 logger = logging.getLogger("JarvisCore")
 
-VERSION = "3.0.3"
+VERSION = "3.7.0"
 INGRESS_IP = "172.30.32.2"  # seul le proxy Ingress du Supervisor peut valider une proposition
 jarvis = JarvisEngine()
 diagnose = SystemDiagnose()
 autonomy: AutonomyEngine | None = None
 engineer: Engineer | None = None
 gate: access.VoiceGate | None = None
-websocket_client: HAWebSocketClient | None = None  # NOUVEAU : Client WebSocket HA
+websocket_client: HAWebSocketClient | None = None  # Client WebSocket HA
+performance_monitor: PerformanceMonitor | None = None  # NOUVEAU : Moniteur de performances
+cache_manager: CacheManager | None = None  # NOUVEAU : Gestionnaire de cache
+action_batcher: ActionBatcher | None = None  # NOUVEAU : Traitement par lots
+performance_optimizer: PerformanceOptimizer | None = None  # NOUVEAU : Optimiseur de performances
 ROLES: dict = {}
 _TZ = {"name": None}
 
-# NOUVEAU : Configuration WebSocket
+# Configuration WebSocket
 HA_WEBSOCKET_ENABLED = os.getenv("HA_WEBSOCKET_ENABLED", "true").lower() == "true"
+
+# NOUVEAU : Configuration des performances
+PERFORMANCE_MONITORING_ENABLED = os.getenv("PERFORMANCE_MONITORING_ENABLED", "true").lower() == "true"
+CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+BATCH_PROCESSING_ENABLED = os.getenv("BATCH_PROCESSING_ENABLED", "true").lower() == "true"
 
 
 async def _local_now() -> datetime:
@@ -168,9 +183,29 @@ def build_autonomy(websocket_enabled: bool = False) -> AutonomyEngine:
 
 @asynccontextmanager
 async def lifespan(_app):
-    global autonomy, websocket_client
+    global autonomy, websocket_client, performance_monitor, cache_manager, action_batcher, performance_optimizer
     
-    # NOUVEAU : Initialiser le WebSocket si activé
+    # NOUVEAU : Initialiser le moniteur de performances
+    if PERFORMANCE_MONITORING_ENABLED:
+        performance_monitor = PerformanceMonitor()
+        await performance_monitor.start()
+        logger.info("✅ Moniteur de performances activé")
+    
+    # NOUVEAU : Initialiser le gestionnaire de cache
+    if CACHE_ENABLED:
+        cache_manager = CacheManager()
+        logger.info("✅ Gestionnaire de cache activé")
+    
+    # NOUVEAU : Initialiser le traitement par lots
+    if BATCH_PROCESSING_ENABLED:
+        action_batcher = ActionBatcher(batch_size=5, max_concurrency=3)
+        logger.info("✅ Traitement par lots activé")
+    
+    # NOUVEAU : Initialiser l'optimiseur de performances
+    performance_optimizer = PerformanceOptimizer()
+    logger.info("✅ Optimiseur de performances activé")
+    
+    # Initialiser le WebSocket si activé
     if HA_WEBSOCKET_ENABLED and config.AUTONOMY_ENABLED:
         try:
             websocket_client = await init_websocket(
@@ -187,10 +222,11 @@ async def lifespan(_app):
     
     # Démarrer le moteur d'autonomie
     task = asyncio.create_task(autonomy.run()) if config.AUTONOMY_ENABLED else None
-    logger.info("Jarvis %s démarré — autonomie %s — WebSocket %s", 
+    logger.info("Jarvis %s démarré — autonomie %s — WebSocket %s — Optimisation %s", 
                 VERSION, 
                 "ACTIVE" if task else "désactivée",
-                "ACTIF" if websocket_client else "INACTIF (polling)")
+                "ACTIF" if websocket_client else "INACTIF (polling)",
+                "ACTIVE" if PERFORMANCE_MONITORING_ENABLED else "INACTIVE")
     
     yield
     
@@ -199,6 +235,10 @@ async def lifespan(_app):
         task.cancel()
     if websocket_client:
         await close_websocket()
+    if performance_monitor:
+        await performance_monitor.stop()
+    if action_batcher:
+        await action_batcher.clear()
 
 
 app = FastAPI(title="Jarvis HA Control", version=VERSION, lifespan=lifespan)
@@ -437,6 +477,39 @@ async def delete_memory(fid: int, request: Request):
     if not autonomy.store.delete_fact(fid):
         raise HTTPException(status_code=404, detail="Fait introuvable.")
     return {"status": "success"}
+
+
+# NOUVEAU : Endpoints pour la gestion des versions et mises a jour
+@app.get("/api/version")
+async def get_version_api(request: Request):
+    """Get current version information."""
+    if not _trusted(request):
+        raise HTTPException(status_code=403, detail="Acces reserve au panneau Jarvis.")
+    version_info = get_version_info()
+    return version_info.to_dict()
+
+
+@app.get("/api/version/check")
+async def check_version_update(request: Request):
+    """Check for available updates."""
+    if not _trusted(request):
+        raise HTTPException(status_code=403, detail="Acces reserve au panneau Jarvis.")
+    update_info = await check_for_updates()
+    if update_info is None:
+        return {"status": "error", "message": "Failed to check for updates"}
+    return update_info.to_dict()
+
+
+@app.get("/api/version/notify")
+async def get_version_notification(request: Request):
+    """Get update notification message."""
+    if not _trusted(request):
+        raise HTTPException(status_code=403, detail="Acces reserve au panneau Jarvis.")
+    notification = version_manager.generate_update_notification()
+    if notification is None:
+        return {"notification": None, "status": "up_to_date"}
+    return {"notification": notification, "status": "update_available"}
+
 
 
 webui = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webui")
