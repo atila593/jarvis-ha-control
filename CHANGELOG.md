@@ -1,11 +1,9 @@
 
-## 3.5.0
-- **Agents IA** : ConversationAgent, DecisionAgent, ActionAgent, Orchestrator pour une autonomie complète
-- **Workflow automatisé** : Conversation → Décision → Action en un seul flux
-- **Gestion des priorités** : File d attente avec priorisation des actions
-- **Sécurité renforcée** : Vérification des préconditions et postconditions
-- **Rollback automatique** : Annulation des actions en cas d échec
-- **Tests unitaires** : Tests complets pour tous les agents
+## 3.4.0
+- **Mémoire des préférences** : Système de mémoire des actions et des faits par utilisateur
+- **Validation vocale sécurisée** : VoiceGate avec code PIN, verrouillage après échecs, rôles admin/member/guest
+- **Tests complets** : 45+ tests unitaires pour la mémoire et la validation vocale
+- **Intégration Store** : Gestion des faits (facts) persistants dans SQLite
 
 ## 3.3.1
 - **FIX: Correction bug pickle** : Remplacement des threading.Lock() par des transactions SQLite + implémentation de __getstate__/__setstate__ pour permettre la sérialisation de l'objet Store
