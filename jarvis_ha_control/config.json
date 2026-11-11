@@ -1,0 +1,175 @@
+{
+  "name": "Jarvis HA Control",
+  "version": "4.0.0",
+  "slug": "jarvis-ha-control",
+  "description": "Assistant vocal intelligent et système autonome pour Home Assistant avec gestion des entités en temps réel",
+  "url": "https://github.com/atila593/jarvis-ha-control",
+  "arch": ["amd64", "aarch64", "armhf", "armv7", "i386"],
+  "startup": "application",
+  "boot": "auto",
+  "ports": {
+    "8080/tcp": 8080
+  },
+  "ports_description": {
+    "8080/tcp": "Interface web de Jarvis"
+  },
+  "map": [
+    "config"
+  ],
+  "options": {
+    "language": "french",
+    "entities": [],
+    "cameras": [],
+    "sensors": [],
+    "lights": [],
+    "covers": [],
+    "switches": [],
+    "tts_entity": "",
+    "auto_update": true,
+    "notify_updates": true,
+    "autonomy_enabled": true,
+    "autonomy_quiet_hours": "22:00-07:00",
+    "confidence_threshold": 70,
+    "max_actions_per_hour": 50,
+    "gemini_api_key": ""
+  },
+  "schema": {
+    "language": "list(french|english|spanish)",
+    "entities": {
+      "name": "Entités à surveiller",
+      "description": "Sélectionnez toutes les entités que Jarvis doit surveiller et gérer. Vous pouvez aussi configurer par catégorie ci-dessous.",
+      "selector": {
+        "entity": {
+          "multiple": true,
+          "include_entities": []
+        }
+      }
+    },
+    "cameras": {
+      "name": "Caméras pour la vidéosurveillance",
+      "description": "Sélectionnez les caméras que Jarvis doit surveiller pour la détection de mouvement et la sécurité.",
+      "selector": {
+        "entity": {
+          "multiple": true,
+          "filter": ["camera"]
+        }
+      }
+    },
+    "sensors": {
+      "name": "Capteurs à surveiller",
+      "description": "Sélectionnez les capteurs (température, humidité, mouvement, etc.) que Jarvis doit surveiller.",
+      "selector": {
+        "entity": {
+          "multiple": true,
+          "filter": ["sensor", "binary_sensor"]
+        }
+      }
+    },
+    "lights": {
+      "name": "Lumières à contrôler",
+      "description": "Sélectionnez les lumières que Jarvis peut allumer, éteindre ou ajuster automatiquement.",
+      "selector": {
+        "entity": {
+          "multiple": true,
+          "filter": ["light"]
+        }
+      }
+    },
+    "covers": {
+      "name": "Volets et portes à contrôler",
+      "description": "Sélectionnez les volets, stores et portes que Jarvis peut ouvrir ou fermer.",
+      "selector": {
+        "entity": {
+          "multiple": true,
+          "filter": ["cover"]
+        }
+      }
+    },
+    "switches": {
+      "name": "Interrupteurs à contrôler",
+      "description": "Sélectionnez les interrupteurs et prises que Jarvis peut activer ou désactiver.",
+      "selector": {
+        "entity": {
+          "multiple": true,
+          "filter": ["switch", "plug"]
+        }
+      }
+    },
+    "tts_entity": {
+      "name": "Entité TTS pour les rapports vocaux",
+      "description": "Sélectionnez l'entité TTS (Text-To-Speech) que Jarvis utilisera pour les rapports vocaux.",
+      "selector": {
+        "entity": {
+          "filter": ["tts", "media_player"]
+        }
+      }
+    },
+    "auto_update": {
+      "name": "Vérifier les mises à jour automatiquement",
+      "description": "Si activé, Jarvis vérifiera automatiquement les nouvelles versions disponibles.",
+      "default": true,
+      "selector": {
+        "boolean": {}
+      }
+    },
+    "notify_updates": {
+      "name": "Notifier des mises à jour dans HA",
+      "description": "Si activé, vous recevrez une notification dans Home Assistant lorsqu'une nouvelle version est disponible.",
+      "default": true,
+      "selector": {
+        "boolean": {}
+      }
+    },
+    "autonomy_enabled": {
+      "name": "Activer le mode autonome",
+      "description": "Si activé, Jarvis prendra des décisions et exécutera des actions automatiquement en fonction des règles configurées.",
+      "default": true,
+      "selector": {
+        "boolean": {}
+      }
+    },
+    "autonomy_quiet_hours": {
+      "name": "Heures silencieuses",
+      "description": "Période pendant laquelle Jarvis ne prendra pas d'actions autonomes (format: HH:MM-HH:MM).",
+      "default": "22:00-07:00",
+      "selector": {
+        "text": {}
+      }
+    },
+    "confidence_threshold": {
+      "name": "Seuil de confiance minimum",
+      "description": "Seuil de confiance minimum (en %) pour que Jarvis exécute une action autonome. Les actions avec une confiance inférieure seront proposées pour validation.",
+      "default": 70,
+      "selector": {
+        "number": {
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "mode": "slider"
+        }
+      }
+    },
+    "max_actions_per_hour": {
+      "name": "Actions maximales par heure",
+      "description": "Nombre maximum d'actions autonomes que Jarvis peut exécuter par heure.",
+      "default": 50,
+      "selector": {
+        "number": {
+          "min": 0,
+          "max": 200,
+          "step": 1,
+          "mode": "slider"
+        }
+      }
+    },
+    "gemini_api_key": {
+      "name": "Clé API Google Gemini",
+      "description": "Clé API pour accéder à Google Gemini (nécessaire pour les fonctionnalités avancées d'IA).",
+      "selector": {
+        "text": {
+          "type": "password"
+        }
+      }
+    }
+  }
+}

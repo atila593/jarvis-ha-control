@@ -39,7 +39,7 @@ from tools.sys_diagnose import SystemDiagnose  # noqa: E402
 logging.basicConfig(level=config.LOG_LEVEL)
 logger = logging.getLogger("JarvisCore")
 
-VERSION = "3.7.0"
+VERSION = "4.0.0"
 INGRESS_IP = "172.30.32.2"  # seul le proxy Ingress du Supervisor peut valider une proposition
 jarvis = JarvisEngine()
 diagnose = SystemDiagnose()
@@ -510,6 +510,102 @@ async def get_version_notification(request: Request):
         return {"notification": None, "status": "up_to_date"}
     return {"notification": notification, "status": "update_available"}
 
+
+@app.get("/api/entities")
+async def get_entities(request: Request):
+    """Get all entities from Home Assistant for entity selector."""
+    if not _trusted(request):
+        raise HTTPException(status_code=403, detail="Acces reserve au panneau Jarvis.")
+    try:
+        import httpx
+        headers = {"Authorization": f"Bearer {config.SUPERVISOR_TOKEN}"}
+        async with httpx.AsyncClient(timeout=30) as http:
+            response = await http.get(f"{config.HA_API_URL}/states", headers=headers)
+            response.raise_for_status()
+            states = response.json()
+            entities = []
+            for entity_id, state in states.items():
+                entities.append({
+                    "entity_id": entity_id,
+                    "state": state.get("state", ""),
+                    "attributes": state.get("attributes", {}),
+                    "last_changed": state.get("last_changed", ""),
+                    "last_updated": state.get("last_updated", "")
+                })
+            return entities
+    except Exception as e:
+        logger.error(f"Error fetching entities: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching entities: {str(e)}")
+
+
+@app.get("/api/realtime-activity")
+async def get_realtime_activity(request: Request):
+    """Get real-time activity data for dashboard."""
+    if not _trusted(request):
+        raise HTTPException(status_code=403, detail="Acces reserve au panneau Jarvis.")
+    
+    # Get in-progress actions
+    in_progress = []
+    if autonomy:
+        for action in autonomy.in_progress_actions:
+            in_progress.append({
+                "id": action.id,
+                "timestamp": action.start_time.strftime("%H:%M:%S") if action.start_time else "--:--:--",
+                "action": action.action,
+                "entity": action.entity_id,
+                "progress": action.progress,
+                "estimated_time_remaining": action.estimated_time_remaining
+            })
+    
+    # Get last actions from journal
+    last_actions = []
+    try:
+        import httpx
+        headers = {"Authorization": f"Bearer {config.SUPERVISOR_TOKEN}"}
+        async with httpx.AsyncClient(timeout=10) as http:
+            response = await http.get(f"{config.HA_API_URL}/api/jarvis/journal?limit=10", headers=headers)
+            if response.status_code == 200:
+                journal_data = response.json()
+                for item in journal_data.get("items", [])[:5]:
+                    last_actions.append({
+                        "timestamp": item.get("ts", "--:--:--"),
+                        "action": item.get("message", ""),
+                        "entity": item.get("entity_id", ""),
+                        "status": item.get("status", "completed")
+                    })
+    except Exception:
+        pass
+    
+    # Get autonomy decisions
+    autonomy_decisions = []
+    if autonomy:
+        for decision in autonomy.recent_decisions[:5]:
+            autonomy_decisions.append({
+                "timestamp": decision.timestamp.strftime("%H:%M:%S") if decision.timestamp else "--:--:--",
+                "reason": decision.reason,
+                "action": decision.action,
+                "confidence": decision.confidence,
+                "status": decision.status
+            })
+    
+    # Get journal
+    journal = []
+    try:
+        import httpx
+        headers = {"Authorization": f"Bearer {config.SUPERVISOR_TOKEN}"}
+        async with httpx.AsyncClient(timeout=10) as http:
+            response = await http.get(f"{config.HA_API_URL}/api/jarvis/journal?limit=10", headers=headers)
+            if response.status_code == 200:
+                journal = response.json().get("items", [])[:10]
+    except Exception:
+        pass
+    
+    return {
+        "in_progress": in_progress,
+        "last_actions": last_actions,
+        "autonomy_decisions": autonomy_decisions,
+        "journal": journal
+    }
 
 
 webui = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webui")
