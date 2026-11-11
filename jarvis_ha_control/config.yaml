@@ -1,5 +1,5 @@
 name: Jarvis HA Control
-version: "4.0.2"
+version: "4.0.3"
 slug: jarvis_ha_control
 description: "Assistant Gemini, HUD web futuriste et diagnostic systeme pour Home Assistant. Version 4.0.0 : Dashboard IA autonome sans scroll + Sélecteur d'entités dropdown + Zone d'activité temps réel + Configuration avec menus déroulants + Design tactile-friendly."
 url: https://github.com/atila593/jarvis-ha-control
