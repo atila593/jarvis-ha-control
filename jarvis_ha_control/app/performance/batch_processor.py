@@ -9,7 +9,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
 
 logger = logging.getLogger(__name__)
 
