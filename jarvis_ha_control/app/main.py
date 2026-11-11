@@ -28,6 +28,7 @@ from autonomy.ha import HaClient  # noqa: E402
 from autonomy.ha_websocket import HAWebSocketClient, init_websocket, close_websocket  # noqa: E402
 from autonomy.store import Store  # noqa: E402
 from autonomy.vision import Vision, VisionSettings  # noqa: E402
+from version import version_manager, get_version, get_version_info, check_for_updates  # noqa: E402
 from tools.toolbox import Toolbox  # noqa: E402
 from tools import presence  # noqa: E402
 from tools.actions import ActionRunner  # noqa: E402
@@ -476,6 +477,39 @@ async def delete_memory(fid: int, request: Request):
     if not autonomy.store.delete_fact(fid):
         raise HTTPException(status_code=404, detail="Fait introuvable.")
     return {"status": "success"}
+
+
+# NOUVEAU : Endpoints pour la gestion des versions et mises a jour
+@app.get("/api/version")
+async def get_version_api(request: Request):
+    """Get current version information."""
+    if not _trusted(request):
+        raise HTTPException(status_code=403, detail="Acces reserve au panneau Jarvis.")
+    version_info = get_version_info()
+    return version_info.to_dict()
+
+
+@app.get("/api/version/check")
+async def check_version_update(request: Request):
+    """Check for available updates."""
+    if not _trusted(request):
+        raise HTTPException(status_code=403, detail="Acces reserve au panneau Jarvis.")
+    update_info = await check_for_updates()
+    if update_info is None:
+        return {"status": "error", "message": "Failed to check for updates"}
+    return update_info.to_dict()
+
+
+@app.get("/api/version/notify")
+async def get_version_notification(request: Request):
+    """Get update notification message."""
+    if not _trusted(request):
+        raise HTTPException(status_code=403, detail="Acces reserve au panneau Jarvis.")
+    notification = version_manager.generate_update_notification()
+    if notification is None:
+        return {"notification": None, "status": "up_to_date"}
+    return {"notification": notification, "status": "update_available"}
+
 
 
 webui = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webui")
