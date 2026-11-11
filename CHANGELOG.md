@@ -1,4 +1,15 @@
 
+## 3.7.0
+- **Optimisation des performances** : Module complet pour maximiser la reactivite et l'efficacite
+- **Mise en cache** : LRU Cache, TTL Cache, CacheManager pour reduire la latence
+- **Pool de connexions** : ConnectionPool, DatabaseConnectionPool, HTTPConnectionPool pour une gestion efficace des ressources
+- **Traitement par lots** : BatchProcessor, ActionBatcher pour un traitement optimise des actions
+- **Monitoring des performances** : MetricsCollector, PerformanceMonitor pour un suivi en temps reel
+- **Optimisation automatique** : PerformanceOptimizer avec ajustement dynamique des parametres
+- **Caching des requetes** : Reduit les appels repetitifs a Home Assistant
+- **Connexions reusees** : Pool de connexions SQLite et HTTP pour une meilleure efficacite
+- **Traitement parallele** : Execution par lots avec gestion de la concurrence
+
 ## 3.6.0
 - **MonitoringAgent** : Surveillance complete du systeme (CPU, memoire, disque, reseau)
 - **SecurityAgent** : Gestion des utilisateurs, roles, permissions et authentification
