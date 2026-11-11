@@ -32,9 +32,17 @@ async def speak(text: str) -> dict:
     headers = {"Authorization": f"Bearer {config.SUPERVISOR_TOKEN}"}
     try:
         async with httpx.AsyncClient(timeout=10) as http:
-            res = await http.post(f"{config.HA_API_URL}/services/{domain}/{name}", headers=headers, json=payload)
+            # Utilise l'API standard HA pour appeler un service
+            # /api/services/<domain>/<service> est le bon endpoint
+            service_call_url = f"{config.HA_API_URL}/services/{domain}/{name}"
+            res = await http.post(service_call_url, headers=headers, json=payload)
         res.raise_for_status()
         return {"spoken": True}
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 400:
+            logger.warning("Service TTS non trouvé ou mal configuré. Vérifiez speak_service dans les options de l'addon.")
+            return {"spoken": False, "reason": "Service TTS non configuré ou URL incorrecte"}
+        raise
     except Exception as e:
         logger.error("Échec speak via %s: %s", service, e)
         return {"spoken": False, "reason": str(e)}
