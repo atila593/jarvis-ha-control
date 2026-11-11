@@ -1,43 +1,9 @@
 
-## 3.8.0
-- **Tests d'integration complete** : Tests complets pour tous les modules et leur integration
-- **Systeme de versionnement** : Gestion des versions avec detection automatique des mises a jour
-- **Notifications de mise a jour** : Notifications en temps reel pour les nouvelles versions
-- **Integration complete des modules** : Tous les modules (Agents, Performance) sont entierement integrés
-- **Tests de stress** : Tests de performance et de robustesse sous charge
-- **Tests d'erreur** : Gestion complete des erreurs et recuperation
-- **API de version** : Endpoints API pour verifier la version et les mises a jour
-- **Système de cache unifié** : Integration du cache avec tous les composants
-- **Traitement par lots optimisé** : Batch processing intégré avec les agents
-- **Monitoring complet** : Surveillance complete du systeme avec alertes
-
-## 3.7.0
-- **Optimisation des performances** : Module complet pour maximiser la reactivite et l'efficacite
-- **Mise en cache** : LRU Cache, TTL Cache, CacheManager pour reduire la latence
-- **Pool de connexions** : ConnectionPool, DatabaseConnectionPool, HTTPConnectionPool pour une gestion efficace des ressources
-- **Traitement par lots** : BatchProcessor, ActionBatcher pour un traitement optimise des actions
-- **Monitoring des performances** : MetricsCollector, PerformanceMonitor pour un suivi en temps reel
-- **Optimisation automatique** : PerformanceOptimizer avec ajustement dynamique des parametres
-- **Caching des requetes** : Reduit les appels repetitifs a Home Assistant
-- **Connexions reusees** : Pool de connexions SQLite et HTTP pour une meilleure efficacite
-- **Traitement parallele** : Execution par lots avec gestion de la concurrence
-
-## 3.6.0
-- **MonitoringAgent** : Surveillance complete du systeme (CPU, memoire, disque, reseau)
-- **SecurityAgent** : Gestion des utilisateurs, roles, permissions et authentification
-- **Alertes intelligentes** : Detection automatique des anomalies avec seuils configurables
-- **Audit complet** : Journalisation de toutes les actions de securite
-- **Protection renforcee** : Verrouillage des utilisateurs apres trop de tentatives
-- **Gestion des sessions** : Sessions avec timeout et invalidation
-
-
-## 3.5.0
-- **Agents IA** : ConversationAgent, DecisionAgent, ActionAgent, Orchestrator pour une autonomie complète
-- **Workflow automatisé** : Conversation → Décision → Action en un seul flux
-- **Gestion des priorités** : File d attente avec priorisation des actions
-- **Sécurité renforcée** : Vérification des préconditions et postconditions
-- **Rollback automatique** : Annulation des actions en cas d échec
-- **Tests unitaires** : Tests complets pour tous les agents
+## 3.4.0
+- **Mémoire des préférences** : Système de mémoire des actions et des faits par utilisateur
+- **Validation vocale sécurisée** : VoiceGate avec code PIN, verrouillage après échecs, rôles admin/member/guest
+- **Tests complets** : 45+ tests unitaires pour la mémoire et la validation vocale
+- **Intégration Store** : Gestion des faits (facts) persistants dans SQLite
 
 ## 3.3.1
 - **FIX: Correction bug pickle** : Remplacement des threading.Lock() par des transactions SQLite + implémentation de __getstate__/__setstate__ pour permettre la sérialisation de l'objet Store
