@@ -2,8 +2,9 @@ import asyncio
 import logging
 
 import httpx
-from google import genai
-from google.genai import errors, types
+import google.generativeai as genai
+from google.generativeai import types
+from google.api_core import exceptions as google_exceptions
 
 import config
 from assistant.prompts import system_prompt
@@ -126,13 +127,19 @@ class JarvisEngine:
                 except asyncio.TimeoutError:
                     last_error = "délai dépassé"
                     logger.warning("%s: délai dépassé (essai %d)", model, attempt + 1)
-                except errors.APIError as e:
-                    last_error = f"{e.code} {e.status}"
-                    retry_after, quota, detail = quota_info(e)
-                    logger.warning("%s: %s (essai %d) quota=%s retry=%ss — %s", model, last_error, attempt + 1,
-                                   quota, retry_after, detail)
-                    if e.code not in RETRYABLE:
-                        break  # erreur définitive pour ce modèle → modèle suivant
+                except Exception as e:
+                    # Capture les erreurs API (GoogleAPICallError, GenerativeAIError, etc.)
+                    if hasattr(e, 'code') and hasattr(e, 'status'):
+                        last_error = f"{e.code} {e.status}"
+                        retry_after, quota, detail = quota_info(e)
+                        logger.warning("%s: %s (essai %d) quota=%s retry=%ss — %s", model, last_error, attempt + 1,
+                                       quota, retry_after, detail)
+                        if e.code not in RETRYABLE:
+                            break  # erreur définitive pour ce modèle → modèle suivant
+                    else:
+                        last_error = str(e)
+                        logger.warning("%s: %s (essai %d)", model, last_error, attempt + 1)
+                        break  # erreur inattendue, passer au modèle suivant
                 if attempt < attempts - 1:
                     await asyncio.sleep(1.5 * (attempt + 1))
         raise GeminiUnavailable(f"Gemini indisponible ({last_error}). Réessaie dans un instant.",
